@@ -92,7 +92,7 @@ export const AUCTION_FIELD_TYPES: any = {
   finalHighestBid: 'number',
   highestBid: 'number',
   series: 'string',
-  rarity: 'int',
+  rarity: 'intarray',
   tier: 'int',
 };
 export const AUCTION_FIELDS: string[] = [

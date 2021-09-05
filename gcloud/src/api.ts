@@ -51,17 +51,58 @@ const api = async (req, res, next) => {
 
     console.info(req.query);
 
-    // parse where
-    // sold, ended, active, owner (is user the owner of auction), nft series, rarity, tier
+    const nftWhereFields = ['series', 'rarity', 'tier'];
+    const equalityWhereFields = [
+      'auctionId',
+      'nftToken',
+      'nftTokenId',
+      'owner',
+      'token',
+      'isSettled',
+      'highestBidder',
+      'auctionType',
+      'isSold',
+      'lastToken',
+    ];
+    const inequalityWhereFields = ['endsBefore', 'endsAfter'];
     const allWhereFields = [
-      ...AUCTION_FIELDS,
-      'series',
+      ...equalityWhereFields,
+      ...inequalityWhereFields,
+      ...nftWhereFields,
+    ];
+    const allOrderFields = [
+      'endTime',
+      'auctionId',
+      'nftTokenId',
       'rarity',
       'tier',
-      'endsBefore',
-      'endsAfter',
     ];
-    const nftWhereFields = ['series', 'rarity', 'tier'];
+    const nftOrderFields = ['rarity', 'tier'];
+    const extraValidParams = [
+      'direction',
+      'limit',
+      'startAfter',
+      'orderby',
+      'orderBy',
+    ];
+    const allValidParams = [...allWhereFields, ...extraValidParams];
+
+    // reject invalid params
+    for (const param of Object.keys(req.query)) {
+      console.info(param);
+      if (!allValidParams.includes(param)) {
+        return next(
+          new Error(
+            `invalid param ${param}. valid params are ${allValidParams.join(
+              ', '
+            )}`
+          )
+        );
+      }
+    }
+
+    // parse where
+    // sold, ended, active, owner (is user the owner of auction), nft series, rarity, tier
     const whereClauses: {
       [key: string]: { op: FirebaseFirestore.WhereFilterOp; val: any };
     } = {};
@@ -83,6 +124,17 @@ const api = async (req, res, next) => {
               break;
             case 'int':
               whereClauses[field] = { op: '==', val: parseInt(valStr) };
+              break;
+            case 'intarray':
+              // allow a comma-separated array of ints. if only one value, just treat it as an int
+              const pieces = valStr.split(',').map((val) => parseInt(val));
+              if (pieces.length === 1) {
+                // one int
+                whereClauses[field] = { op: '==', val: pieces[0] };
+              } else {
+                // several ints
+                whereClauses[field] = { op: 'in', val: pieces };
+              }
               break;
             case 'boolean':
               if (valStr.toLowerCase() == 'false') {
@@ -108,28 +160,27 @@ const api = async (req, res, next) => {
 
     // parse orderby
     // endTime, auctionId, nftId, rarity, tier
-    const allOrderFields = [
-      'endTime',
-      'auctionId',
-      'nftTokenId',
-      'rarity',
-      'tier',
-    ];
-    const nftOrderFields = ['rarity', 'tier'];
     let orderBy;
     if (req.query.orderby != null) {
-      orderBy = req.query.orderby;
+      orderBy = req.query.orderby || req.query.orderBy;
 
       if (!allOrderFields.includes(orderBy)) {
         return next(
           new Error('accepted orderby values are ' + allOrderFields.join(','))
         );
       }
-      if (nftOrderFields.includes(orderBy)) {
-        orderBy = 'nftData.' + orderBy;
+
+      // special cases
+      if (orderBy === 'rarity' && whereClauses[orderBy] != null) {
+        // attempting to filter AND sort by rarity doesn't work in firestore
+        orderBy = null;
       }
     } else {
-      if (whereClauses['auctionId'] == null) {
+      // default orderby is auctionId, but only if the query is going to return more than one item
+      if (
+        whereClauses['auctionId'] == null &&
+        whereClauses['nftTokenId'] == null
+      ) {
         orderBy = 'auctionId';
       }
     }
@@ -178,6 +229,10 @@ const api = async (req, res, next) => {
 
     // order by
     if (orderBy != null) {
+      if (nftOrderFields.includes(orderBy)) {
+        orderBy = 'nftData.' + orderBy;
+      }
+
       query = query.orderBy(orderBy, direction);
     }
 
