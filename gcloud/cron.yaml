@@ -1,0 +1,4 @@
+cron:
+  - description: 'sync all auction data with blockchain in batches'
+    url: /api/refreshcron
+    schedule: every 5 minutes
