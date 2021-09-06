@@ -2,6 +2,7 @@ import { differenceInMinutes, differenceInSeconds } from 'date-fns';
 import { Contract, providers } from 'ethers';
 import * as admin from 'firebase-admin';
 import { firestore } from 'firebase-admin';
+import Web3 from 'web3';
 import {
   AuctionData,
   AUCTION_FIELDS,
@@ -9,6 +10,7 @@ import {
   createAuctionData,
 } from './AuctionData';
 import * as MarketplaceABI from './NftMarketplace.json';
+import { UserBids } from './UserBids';
 import * as utils from './utils';
 
 export const createApiRoutes = (app) => {
@@ -17,53 +19,26 @@ export const createApiRoutes = (app) => {
   app.get('/api/auction/:id', auctionDetail);
   app.get('/api/auction', api);
   app.get('/api/bidbalanceuser/:address', bidBalanceUser);
-  app.get('/api/refreshall', refreshAll);
+  app.get('/api/userbids/:address', userBids);
+  app.get('/api/userbidsrefresh/:address', userBidsRefresh);
   app.get('/api/refreshcron', refreshCron);
   app.get('/api/bsc/auctionslength', bscAuctionsLength);
   app.get('/api/bsc/auction/:id', bscAuction);
   app.get('/api/bsc/bidbalance/:id/:address', bscBidBalance);
   app.get('/api/bsc/bidbalanceuser/:address', bscBidBalanceForUser);
   app.get('/api/bsc/highestbid/:id', bscHighestBid);
-  app.get('/api/tmp', temp);
-};
-
-/**
- * add highestBid to all auctions
- * @param res
- * @param req
- * @param next
- */
-const temp = async (req, res, next) => {
-  const firestore = admin.firestore();
-  const snap = await firestore.collection(utils.COLLNAME_AUCTION).get();
-  const contract: Contract = utils.getMarketplaceContract();
-  try {
-    console.log(`checking ${snap.size} documents`);
-    for (const doc of snap.docs) {
-      let data: AuctionData = doc.data() as AuctionData;
-
-      if (data.highestBid == null) {
-        const highestBid = await utils.bscGetHighestBid(
-          contract,
-          parseInt(doc.id),
-          data
-        );
-        data.highestBid = highestBid;
-        await doc.ref.set(data);
-        console.log(`${data.auctionId}: added highest bid of ${highestBid}`);
-      }
-    }
-    res.send('success');
-  } catch (err) {
-    return next(err);
-  }
+  app.get('/api/bsc/getuserbidslength/:address', bscGetUserBidsLength);
+  app.get('/api/bsc/getuserbids/:address', bscGetUserBids);
+  // app.get('/api/maintenance1', maintenance1);
+  // app.get('/api/tmp', temp);
+  // app.get('/api/refreshall', refreshAll);
 };
 
 const api = async (req, res, next) => {
   try {
     const firestore = admin.firestore();
 
-    console.info(req.query);
+    // console.info(req.query);
 
     const nftWhereFields = ['series', 'rarity', 'tier'];
     const equalityWhereFields = [
@@ -103,7 +78,7 @@ const api = async (req, res, next) => {
 
     // reject invalid params
     for (const param of Object.keys(req.query)) {
-      console.info(param);
+      // console.info(param);
       if (!allValidParams.includes(param)) {
         return next(
           new Error(
@@ -229,14 +204,14 @@ const api = async (req, res, next) => {
 
     // where clauses
     if (Object.keys(whereClauses).length > 0) {
-      console.info(whereClauses);
+      // console.info(whereClauses);
       for (const key in whereClauses) {
         const val = whereClauses[key].val;
         const op = whereClauses[key].op;
         const whereField = nftWhereFields.includes(key)
           ? 'nftData.' + key
           : key;
-        console.info(whereField, op, val);
+        // console.info(whereField, op, val);
         query = query.where(whereField, op, val);
       }
     }
@@ -325,7 +300,7 @@ const auctionRaw = async (req, res, next) => {
  */
 const bscAuctionsLength = async (req, res, next) => {
   try {
-    const result = await utils.auctionsLength();
+    const result = await utils.bscAuctionsLength();
     return res.json(result);
   } catch (err) {
     return next(err);
@@ -389,6 +364,47 @@ const bscBidBalance = async (req, res, next) => {
 };
 
 /**
+ * get userBids from database
+ * @param req
+ * @param res
+ * @param next
+ * @returns
+ */
+const userBids = async (req, res, next) => {
+  try {
+    const address: string = req.params.address;
+    if (address == null) throw new Error('no address');
+
+    const result = await utils.getUserBids(address);
+    res.json(result);
+  } catch (err) {
+    return next(err);
+  }
+};
+
+/**
+ * refresh user bids from blockchain
+ * @param req
+ * @param res
+ * @param next
+ * @returns
+ */
+const userBidsRefresh = async (req, res, next) => {
+  const firestore = admin.firestore();
+
+  const address: string = req.params.address;
+  if (address == null) throw new Error('no address');
+
+  try {
+    await utils.refreshUserBids(address);
+
+    res.send('success');
+  } catch (err) {
+    return next(err);
+  }
+};
+
+/**
  * get the auctions the user has a balance in
  * @param req
  * @param res
@@ -443,6 +459,34 @@ const bscBidBalanceForUser = async (req, res, next) => {
     log('finished');
 
     res.end();
+  } catch (err) {
+    return next(err);
+  }
+};
+
+const bscGetUserBidsLength = async (req, res, next) => {
+  try {
+    const contract = utils.getMarketplaceContract();
+
+    const address: string = req.params.address;
+    if (address == null) throw new Error('no address');
+
+    const result = await utils.bscGetUserBidsLength(contract, address);
+    res.json(result);
+  } catch (err) {
+    return next(err);
+  }
+};
+
+const bscGetUserBids = async (req, res, next) => {
+  try {
+    const contract = utils.getMarketplaceContract();
+
+    const address: string = req.params.address;
+    if (address == null) throw new Error('no address');
+
+    const result = await utils.bscGetUserBids(contract, address);
+    res.json(result);
   } catch (err) {
     return next(err);
   }
@@ -549,7 +593,7 @@ const refreshCron = async (req, res) => {
   }
 
   // grab total number of auctions
-  let numAuctions = await utils.auctionsLength();
+  let numAuctions = await utils.bscAuctionsLength();
   log(`refreshCron: number of auctions: ${numAuctions}`);
 
   // set up the next batch
@@ -597,7 +641,7 @@ const refreshAll = async (req, res) => {
   log('refreshAll: refreshing from blockchain:');
 
   // grab total number of auctions
-  let numAuctions = await utils.auctionsLength();
+  let numAuctions = await utils.bscAuctionsLength();
   log(`refreshAll: number of auctions: ${numAuctions}`);
 
   let refreshOn = false;

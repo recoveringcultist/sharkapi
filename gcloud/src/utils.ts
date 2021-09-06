@@ -4,11 +4,14 @@ import { AuctionData, AUCTION_FIELDS, NftData } from './AuctionData';
 import * as MarketplaceABI from './NftMarketplace.json';
 import fetch from 'node-fetch';
 import * as admin from 'firebase-admin';
+import { UserBids } from './UserBids';
 
 export const HAMMER_NFT: string = '0xcA56AF4bde480B3c177E1A4115189F261C2af034';
 export const SHARK_NFT: string = '0x13e14f6EC8fee53b69eBd4Bd69e35FFCFe8960DE';
 export const COLLNAME_AUCTION: string = 'auctiondata';
 export const COLLNAME_BIDBALANCE: string = 'bidbalance';
+export const COLLNAME_USERBIDS: string = 'userbids';
+
 export const NULL_ADDRESS: string =
   '0x0000000000000000000000000000000000000000';
 
@@ -23,17 +26,17 @@ export const getMarketplaceContract = () =>
   );
 
 /**
- * get total number of auctions from blockchain
+ * BSC: get total number of auctions
  * @returns
  */
-export async function auctionsLength() {
+export async function bscAuctionsLength() {
   const contract = getMarketplaceContract();
   const numAuctions = await contract.auctionsLength();
   return parseInt(numAuctions.toString());
 }
 
 /**
- * get auction data from blockchain
+ * BSC: get auction data
  * @param contract
  * @param auctionId
  */
@@ -215,6 +218,57 @@ export async function bscGetBidBalance(
 }
 
 /**
+ * get the number of bids for a user
+ * @param contract
+ * @param address
+ */
+export async function bscGetUserBidsLength(
+  contract: Contract,
+  address: string
+) {
+  const numBids = await contract.getUserBidsLength(address);
+  console.log(numBids);
+  return parseInt(numBids.toString());
+}
+
+/**
+ * get all the user's bids
+ * @param contract
+ * @param address
+ * @returns
+ */
+export async function bscGetUserBids(contract: Contract, address: string) {
+  const numBids = await bscGetUserBidsLength(contract, address);
+  const batchSize = 20;
+
+  // get the bids in batches
+  const result: UserBids = {
+    address,
+    bids: [],
+  };
+  for (let cursor = 0; cursor < numBids; cursor += batchSize) {
+    const bids: any[] = await contract.getUserBids(address, cursor, batchSize);
+
+    // console.log(bids);
+    const numBidsInBatch = bids[0].length;
+    // console.log(`bscgetuserbids batch received ${numBidsInBatch} bids`);
+
+    const auctionId_ = bids[0];
+    const amount_ = bids[1];
+
+    // add the batch to the result list
+    for (let i = 0; i < numBidsInBatch; i++) {
+      result.bids.push({
+        auctionId: parseInt(auctionId_[i].toString()),
+        amount: parseFloat(Web3.utils.fromWei(amount_[i].toString(), 'ether')),
+      });
+    }
+  }
+
+  return result;
+}
+
+/**
  * get the highest bid for an auction whether it's settled or not
  * @param contract
  * @param auctionId auctionId to look it up on the blockchain
@@ -297,6 +351,37 @@ export async function saveBidBalance(
   const data = {};
   data[auctionId] = amount;
   return firestore.doc(`${COLLNAME_BIDBALANCE}/${address}`).update(data);
+}
+
+/**
+ * load userBids data from db
+ * @param id
+ * @returns
+ */
+export async function getUserBids(address: string): Promise<UserBids> {
+  const firestore = admin.firestore();
+
+  const snap = await firestore.doc(`${COLLNAME_USERBIDS}/${address}`).get();
+  if (snap.exists) {
+    return snap.data() as UserBids;
+  } else {
+    return {
+      address,
+      bids: [],
+    };
+  }
+}
+
+/**
+ * save userbids to db
+ * @param userBids
+ * @returns
+ */
+export async function saveUserBids(userBids: UserBids) {
+  const firestore = admin.firestore();
+  return firestore
+    .doc(`${COLLNAME_USERBIDS}/${userBids.address}`)
+    .set(userBids);
 }
 
 /**
@@ -433,6 +518,16 @@ export function createAuctionDataFromAuction(
 }
 
 /**
+ * refresh user's bids in db from the blockchain
+ * @param address
+ */
+export async function refreshUserBids(address: string) {
+  const contract = getMarketplaceContract();
+  const userBids: UserBids = await bscGetUserBids(contract, address);
+  await saveUserBids(userBids);
+}
+
+/**
  * refresh an auction in the db from the blockchain
  * @param id
  */
@@ -445,9 +540,9 @@ export async function refreshAuction(id: number) {
     await saveAuctionData(auctionData);
   } else {
     // only refresh the parts that differ from the blockchain, and only if the auction is not settled
-    if (existingData.isSettled) {
-      return;
-    }
+    // if (existingData.isSettled) {
+    //   return;
+    // }
 
     // compare with data from from blockchain
     const contract: Contract = getMarketplaceContract();
@@ -487,12 +582,19 @@ export async function refreshAuction(id: number) {
         existingData.highestBidder = auctionData.highestBidder;
         changed = true;
       }
-      existingData.highestBid = await bscGetHighestBid(
-        contract,
-        id,
-        existingData
-      );
-      changed = true;
+
+      const highestBid = await bscGetHighestBid(contract, id, existingData);
+      if (existingData.highestBid != highestBid) {
+        existingData.highestBid = highestBid;
+        changed = true;
+      }
+      if (
+        existingData.isSettled &&
+        existingData.finalHighestBid != highestBid
+      ) {
+        existingData.finalHighestBid = highestBid;
+        changed = true;
+      }
     }
 
     // grab existing data from db, overwrite with blockchain data
