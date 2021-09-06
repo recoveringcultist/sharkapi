@@ -16,32 +16,46 @@ export const createApiRoutes = (app) => {
   app.get('/api/auctionrefresh/:id', auctionRefresh);
   app.get('/api/auction/:id', auctionDetail);
   app.get('/api/auction', api);
+  app.get('/api/bidbalanceuser/:address', bidBalanceUser);
   app.get('/api/refreshall', refreshAll);
   app.get('/api/refreshcron', refreshCron);
   app.get('/api/bsc/auctionslength', bscAuctionsLength);
   app.get('/api/bsc/auction/:id', bscAuction);
   app.get('/api/bsc/bidbalance/:id/:address', bscBidBalance);
+  app.get('/api/bsc/bidbalanceuser/:address', bscBidBalanceForUser);
   app.get('/api/bsc/highestbid/:id', bscHighestBid);
-  app.get('/api/temp', temp);
+  app.get('/api/tmp', temp);
 };
 
-const temp = async (res, req, next) => {
+/**
+ * add highestBid to all auctions
+ * @param res
+ * @param req
+ * @param next
+ */
+const temp = async (req, res, next) => {
   const firestore = admin.firestore();
   const snap = await firestore.collection(utils.COLLNAME_AUCTION).get();
   const contract: Contract = utils.getMarketplaceContract();
-  for (const doc of snap.docs) {
-    let data: AuctionData = doc.data() as AuctionData;
+  try {
+    console.log(`checking ${snap.size} documents`);
+    for (const doc of snap.docs) {
+      let data: AuctionData = doc.data() as AuctionData;
 
-    if (data.highestBid == null) {
-      const highestBid = await utils.bscGetHighestBid(
-        contract,
-        parseInt(doc.id),
-        data
-      );
-      data.highestBid = highestBid;
-      await doc.ref.set(data);
-      console.log(`${data.auctionId}: added highest bid of ${highestBid}`);
+      if (data.highestBid == null) {
+        const highestBid = await utils.bscGetHighestBid(
+          contract,
+          parseInt(doc.id),
+          data
+        );
+        data.highestBid = highestBid;
+        await doc.ref.set(data);
+        console.log(`${data.auctionId}: added highest bid of ${highestBid}`);
+      }
     }
+    res.send('success');
+  } catch (err) {
+    return next(err);
   }
 };
 
@@ -369,6 +383,66 @@ const bscBidBalance = async (req, res, next) => {
 
     const balance = await utils.bscGetBidBalance(contract, id, address);
     res.json(balance);
+  } catch (err) {
+    return next(err);
+  }
+};
+
+/**
+ * get the auctions the user has a balance in
+ * @param req
+ * @param res
+ * @param next
+ * @returns
+ */
+const bidBalanceUser = async (req, res, next) => {
+  try {
+    const address: string = req.params.address;
+    if (address == null) throw new Error('no address');
+
+    const result = await utils.getBidBalanceUser(address);
+    res.json(result);
+  } catch (err) {
+    return next(err);
+  }
+};
+
+/**
+ * get bid balance from blockchain for all auctions for user. requires :address
+ * @param req
+ * @param res
+ * @param next
+ * @returns
+ */
+const bscBidBalanceForUser = async (req, res, next) => {
+  function log(msg) {
+    res.write(msg + '\n');
+    console.info(msg);
+  }
+
+  try {
+    const contract = utils.getMarketplaceContract();
+
+    const address: string = req.params.address;
+    if (address == null) throw new Error('no address');
+
+    const numAuctions_ = await contract.auctionsLength();
+    const numAuctions = parseInt(numAuctions_.toString());
+
+    res.status(200);
+
+    log(`${numAuctions} total auctions`);
+
+    for (let i = 0; i < numAuctions; i++) {
+      const balance = await utils.bscGetBidBalance(contract, i, address);
+      if (balance > 0) {
+        log(`auction ${i}, balance ${balance}`);
+      }
+    }
+
+    log('finished');
+
+    res.end();
   } catch (err) {
     return next(err);
   }

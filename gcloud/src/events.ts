@@ -39,6 +39,9 @@ export const registerForEvents = () => {
         await utils.saveAuctionData(existingData);
       }
 
+      // save bid balance info
+      await utils.saveBidBalance(auctionId, highestBidder, amount);
+
       // await supabase
       //   .from("marketplace")
       //   .update({
@@ -102,6 +105,9 @@ export const registerForEvents = () => {
           existingData.lastToken = token;
           await utils.saveAuctionData(existingData);
         }
+
+        // save bid balance info
+        await utils.saveBidBalance(auctionId, highestBidder, 0);
       } catch (e: any) {
         console.error('event: sold: error encountered');
         console.error(e.message + '\n' + e.stack);
@@ -109,7 +115,12 @@ export const registerForEvents = () => {
     }
   );
 
-  marketplace.on('CloseAuction', async (auctionId_) => {
+  marketplace.on('WithdrawAll', async (auctionId_, account) => {
+    const auctionId: number = parseInt(auctionId_.toString());
+    console.log(`event: withdrawall, auctionId: ${auctionId}`);
+  });
+
+  marketplace.on('CloseAuction', async (auctionId_, highestBidder) => {
     const auctionId: number = parseInt(auctionId_.toString());
     console.log(`event: closeauction, auctionId: ${auctionId}`);
 
@@ -122,7 +133,11 @@ export const registerForEvents = () => {
           false
         );
         await utils.saveAuctionData(auctionData);
+        // can't save bid balance info in this case...
       } else {
+        // save bid balance info
+        await utils.saveBidBalance(auctionId, existingData.highestBidder, 0);
+
         // update changed fields
         existingData.isSettled = true;
         existingData.highestBidder = utils.NULL_ADDRESS;
@@ -148,7 +163,12 @@ export const registerForEvents = () => {
           false
         );
         await utils.saveAuctionData(auctionData);
+
+        // can't save bid balance in this case
       } else {
+        // save bid balance info
+        await utils.saveBidBalance(auctionId, existingData.highestBidder, 0);
+
         // update changed fields
         existingData.highestBidder = utils.NULL_ADDRESS;
         await utils.saveAuctionData(existingData);

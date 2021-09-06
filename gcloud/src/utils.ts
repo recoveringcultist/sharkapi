@@ -8,6 +8,7 @@ import * as admin from 'firebase-admin';
 export const HAMMER_NFT: string = '0xcA56AF4bde480B3c177E1A4115189F261C2af034';
 export const SHARK_NFT: string = '0x13e14f6EC8fee53b69eBd4Bd69e35FFCFe8960DE';
 export const COLLNAME_AUCTION: string = 'auctiondata';
+export const COLLNAME_BIDBALANCE: string = 'bidbalance';
 export const NULL_ADDRESS: string =
   '0x0000000000000000000000000000000000000000';
 
@@ -204,8 +205,13 @@ export async function bscGetBidBalance(
   auctionId: number,
   address: string
 ) {
-  const balance = await contract.bidBalance(auctionId, address);
-  return parseFloat(Web3.utils.fromWei(balance.toString(), 'ether'));
+  const balance_ = await contract.bidBalance(auctionId, address);
+  const balance = parseFloat(Web3.utils.fromWei(balance_.toString(), 'ether'));
+
+  // update in db, why not
+  await saveBidBalance(auctionId, address, balance);
+
+  return balance;
 }
 
 /**
@@ -267,6 +273,62 @@ export async function saveAuctionData(auctionData: AuctionData) {
   return firestore
     .doc(`${COLLNAME_AUCTION}/${auctionData.auctionId}`)
     .set(auctionData);
+}
+
+/**
+ * save bidbalance data to db
+ * @param auctionId
+ * @param address
+ * @param amount
+ * @returns
+ */
+export async function saveBidBalance(
+  auctionId: number,
+  address: string,
+  amount: number
+) {
+  const firestore = admin.firestore();
+
+  const snap = await firestore.doc(`${COLLNAME_BIDBALANCE}/${address}`).get();
+  if (!snap.exists) {
+    await firestore.doc(`${COLLNAME_BIDBALANCE}/${address}`).set({});
+  }
+
+  const data = {};
+  data[auctionId] = amount;
+  return firestore.doc(`${COLLNAME_BIDBALANCE}/${address}`).update(data);
+}
+
+/**
+ * get bidbalancedata from db
+ * @param address
+ * @returns
+ */
+export async function getBidBalanceUser(address: string) {
+  const firestore = admin.firestore();
+
+  const snap = await firestore.doc(`${COLLNAME_BIDBALANCE}/${address}`).get();
+  return snap.exists ? (snap.data() as any) : {};
+}
+
+/**
+ * get bidbalancedata from db
+ * @param address
+ * @returns
+ */
+export async function getBidBalance(auctionId: number, address: string) {
+  const firestore = admin.firestore();
+
+  const snap = await firestore.doc(`${COLLNAME_BIDBALANCE}/${address}`).get();
+
+  if (snap.exists) {
+    const data = snap.data() as any;
+    if (data[auctionId] != null) {
+      return data[auctionId];
+    }
+  }
+
+  return 0;
 }
 
 /**
@@ -406,6 +468,14 @@ export async function refreshAuction(id: number) {
         existingData.nftToken,
         existingData.nftTokenId.toString()
       );
+
+      await saveBidBalance(id, auctionData.highestBidder, 0);
+
+      changed = true;
+    } else if (!existingData.isSettled && auctionData.isSettled) {
+      // missed an end-of-auction event
+      existingData.isSettled = auctionData.isSettled;
+      existingData.highestBidder = auctionData.highestBidder;
       changed = true;
     } else {
       // miscellaneous fields
@@ -415,13 +485,14 @@ export async function refreshAuction(id: number) {
       }
       if (existingData.highestBidder != auctionData.highestBidder) {
         existingData.highestBidder = auctionData.highestBidder;
-        existingData.highestBid = await bscGetHighestBid(
-          contract,
-          id,
-          existingData
-        );
         changed = true;
       }
+      existingData.highestBid = await bscGetHighestBid(
+        contract,
+        id,
+        existingData
+      );
+      changed = true;
     }
 
     // grab existing data from db, overwrite with blockchain data
