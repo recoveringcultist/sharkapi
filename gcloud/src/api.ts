@@ -7,7 +7,6 @@ import {
   AuctionData,
   AUCTION_FIELDS,
   AUCTION_FIELD_TYPES,
-  createAuctionData,
 } from './AuctionData';
 import * as MarketplaceABI from './NftMarketplace.json';
 import { UserBids } from './UserBids';
@@ -284,7 +283,10 @@ const auctionRaw = async (req, res, next) => {
     const id = parseInt(req.params.id);
     if (req.params.id == null || isNaN(id)) return next(new Error('no id'));
 
-    const auctionData: AuctionData = await utils.loadAuctionDataBlockchain(id);
+    const auctionData: AuctionData = await utils.bscGetCompleteAuctionData(
+      id,
+      false
+    ); // await utils.loadAuctionDataBlockchain(id);
 
     res.json(auctionData);
   } catch (err) {
@@ -319,8 +321,7 @@ const bscAuction = async (req, res, next) => {
     const id = parseInt(req.params.id);
     if (req.params.id == null || isNaN(id)) return next(new Error('no id'));
 
-    const contract = utils.getMarketplaceContract();
-    const result = await utils.bscGetAuction(contract, id);
+    const result = await utils.bscGetAuction(id);
     return res.json(result);
   } catch (err) {
     return next(err);
@@ -356,7 +357,7 @@ const bscBidBalance = async (req, res, next) => {
     const address: string = req.params.address;
     if (address == null) throw new Error('no address');
 
-    const balance = await utils.bscGetBidBalance(contract, id, address);
+    const balance = await utils.bscGetBidBalance(id, address, contract);
     res.json(balance);
   } catch (err) {
     return next(err);
@@ -450,7 +451,7 @@ const bscBidBalanceForUser = async (req, res, next) => {
     log(`${numAuctions} total auctions`);
 
     for (let i = 0; i < numAuctions; i++) {
-      const balance = await utils.bscGetBidBalance(contract, i, address);
+      const balance = await utils.bscGetBidBalance(i, address, contract);
       if (balance > 0) {
         log(`auction ${i}, balance ${balance}`);
       }
@@ -466,12 +467,10 @@ const bscBidBalanceForUser = async (req, res, next) => {
 
 const bscGetUserBidsLength = async (req, res, next) => {
   try {
-    const contract = utils.getMarketplaceContract();
-
     const address: string = req.params.address;
     if (address == null) throw new Error('no address');
 
-    const result = await utils.bscGetUserBidsLength(contract, address);
+    const result = await utils.bscGetUserBidsLength(address);
     res.json(result);
   } catch (err) {
     return next(err);
@@ -480,12 +479,10 @@ const bscGetUserBidsLength = async (req, res, next) => {
 
 const bscGetUserBids = async (req, res, next) => {
   try {
-    const contract = utils.getMarketplaceContract();
-
     const address: string = req.params.address;
     if (address == null) throw new Error('no address');
 
-    const result = await utils.bscGetUserBids(contract, address);
+    const result = await utils.bscGetUserBids(address);
     res.json(result);
   } catch (err) {
     return next(err);
@@ -510,10 +507,7 @@ const refreshBatch = async (start: number, end: number) => {
       // wait a bit
       await new Promise((resolve) => setTimeout(resolve, 1000));
     } catch (e: any) {
-      console.error(
-        'refreshBatch: error refreshing auction ' + i + ', queueing for retry'
-      );
-      console.error(e.message + '\n' + e.stack);
+      utils.reportError(e, 'refreshBatch', `queueing auction ${i} for retry`);
 
       failedRefreshes.push(i);
     }
@@ -528,12 +522,11 @@ const refreshBatch = async (start: number, end: number) => {
       // wait a bit
       await new Promise((resolve) => setTimeout(resolve, 1000));
     } catch (e: any) {
-      console.error(
-        'refreshAll: error refreshing auction ' +
-          id +
-          ' for the second time, skipping'
+      utils.reportError(
+        e,
+        'refreshBatch',
+        `auction ${id} failed for the second time, skipping`
       );
-      console.error(e.message + '\n' + e.stack);
     }
   }
 

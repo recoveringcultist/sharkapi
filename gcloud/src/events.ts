@@ -12,9 +12,9 @@ export const registerForEvents = () => {
   console.log('registering for blockchain events');
 
   marketplace.on('Bid', async (auctionId_, amount_, highestBidder) => {
-    const auctionId: number = parseInt(auctionId_.toString());
+    const auctionId: number = utils.bscParseInt(auctionId_);
     let baseMsg = `event: Bid ${auctionId}`;
-    let amount = parseFloat(Web3.utils.fromWei(amount_.toString(), 'ether'));
+    let amount = utils.bscWeiToFloat(amount_);
     console.info(baseMsg + `: amount: ${amount}, bidder: ${highestBidder}`);
 
     try {
@@ -31,7 +31,6 @@ export const registerForEvents = () => {
         // update changed fields
         existingData.highestBidder = highestBidder;
         existingData.highestBid = await utils.bscGetBidBalance(
-          utils.getMarketplaceContract(),
           auctionId,
           highestBidder
         );
@@ -54,17 +53,15 @@ export const registerForEvents = () => {
       //     auctionId,
       //   });
     } catch (e: any) {
-      console.error(
-        baseMsg + ': error encountered\n' + e.message + '\n' + e.stack
-      );
+      utils.reportError(e, baseMsg);
     }
   });
 
   // new auction listed
   marketplace.on('List', async (auctionId_) => {
-    const auctionId: number = parseInt(auctionId_.toString());
+    const auctionId: number = utils.bscParseInt(auctionId_);
     const baseMsg = `event: List ${auctionId}`;
-    console.log(baseMsg);
+    console.info(baseMsg);
 
     try {
       // create data from scratch
@@ -76,9 +73,7 @@ export const registerForEvents = () => {
       // save to database
       await utils.saveAuctionData(auctionData);
     } catch (e: any) {
-      console.error(
-        baseMsg + ': error encountered:\n' + e.message + '\n' + e.stack
-      );
+      utils.reportError(e, baseMsg);
     }
   });
 
@@ -86,10 +81,8 @@ export const registerForEvents = () => {
   marketplace.on(
     'Sold',
     async (auctionId_, salesPrice_, token, highestBidder) => {
-      const auctionId: number = parseInt(auctionId_.toString());
-      const salesPrice: number = parseFloat(
-        Web3.utils.fromWei(salesPrice_.toString(), 'ether')
-      );
+      const auctionId: number = utils.bscParseInt(auctionId_);
+      const salesPrice: number = utils.bscWeiToFloat(salesPrice_);
       const baseMsg = `event: Sold ${auctionId}`;
 
       console.log(
@@ -121,24 +114,22 @@ export const registerForEvents = () => {
         // save bid balance info
         // await utils.saveBidBalance(auctionId, highestBidder, 0);
       } catch (e: any) {
-        console.error(
-          baseMsg + ': error encountered\n' + e.message + '\n' + e.stack
-        );
+        utils.reportError(e, baseMsg);
       }
     }
   );
 
   marketplace.on('WithdrawAll', async (auctionId_, account) => {
-    const auctionId: number = parseInt(auctionId_.toString());
+    const auctionId: number = utils.bscParseInt(auctionId_);
     const baseMsg = `event: WithdrawAll ${auctionId}`;
-    console.info(baseMsg);
+    console.info(baseMsg + `: account: ${account}`);
     await utils.saveBidBalance(auctionId, account, 0);
   });
 
   marketplace.on('CloseAuction', async (auctionId_, highestBidder) => {
-    const auctionId: number = parseInt(auctionId_.toString());
+    const auctionId: number = utils.bscParseInt(auctionId_);
     const baseMsg = `event: CloseAuction ${auctionId}`;
-    console.info(baseMsg);
+    console.info(baseMsg + `: highestBidder: ${highestBidder}`);
 
     try {
       // refresh user's bids
@@ -163,18 +154,19 @@ export const registerForEvents = () => {
         await utils.saveAuctionData(existingData);
       }
     } catch (e: any) {
-      console.error(
-        baseMsg + ': error encountered\n' + e.message + '\n' + e.stack
-      );
+      utils.reportError(e, baseMsg);
     }
   });
 
-  marketplace.on('EmergencyWithdrawal', async (auctionId_) => {
-    const auctionId: number = parseInt(auctionId_.toString());
+  marketplace.on('EmergencyWithdrawal', async (auctionId_, highestBidder) => {
+    const auctionId: number = utils.bscParseInt(auctionId_);
     const baseMsg = `event: EmergencyWithdrawal ${auctionId}`;
     console.info(baseMsg);
 
     try {
+      // refresh user's bids
+      await utils.refreshUserBids(highestBidder);
+
       const existingData: AuctionData = await utils.getAuctionData(auctionId);
       if (!existingData) {
         // somehow we missed prior events, just create the auction data from scratch
@@ -183,12 +175,7 @@ export const registerForEvents = () => {
           false
         );
         await utils.saveAuctionData(auctionData);
-
-        // can't save bid balance in this case
       } else {
-        // refresh user's bids
-        await utils.refreshUserBids(existingData.highestBidder);
-
         // save bid balance info
         // await utils.saveBidBalance(auctionId, existingData.highestBidder, 0);
 
@@ -197,9 +184,7 @@ export const registerForEvents = () => {
         await utils.saveAuctionData(existingData);
       }
     } catch (e: any) {
-      console.error(
-        baseMsg + ': error encountered\n' + e.message + '\n' + e.stack
-      );
+      utils.reportError(e, baseMsg);
     }
   });
 };

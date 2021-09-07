@@ -1,4 +1,4 @@
-import { Contract, providers } from 'ethers';
+import { BigNumber, Contract, providers } from 'ethers';
 import Web3 from 'web3';
 import { AuctionData, AUCTION_FIELDS, NftData } from './AuctionData';
 import * as MarketplaceABI from './NftMarketplace.json';
@@ -29,21 +29,23 @@ export const getMarketplaceContract = () =>
  * BSC: get total number of auctions
  * @returns
  */
-export async function bscAuctionsLength() {
-  const contract = getMarketplaceContract();
-  const numAuctions = await contract.auctionsLength();
-  return parseInt(numAuctions.toString());
+export async function bscAuctionsLength(contract?: Contract) {
+  if (!contract) contract = getMarketplaceContract();
+  const numAuctions = await contractCall('auctionsLength', undefined, contract);
+
+  return bscParseInt(numAuctions);
 }
 
 /**
  * BSC: get auction data
- * @param contract
  * @param auctionId
+ * @param contract
  */
-export async function bscGetAuction(contract: Contract, auctionId: number) {
+export async function bscGetAuction(auctionId: number, contract?: Contract) {
   // load main auction data
-  const auction = await contract.auctions(auctionId);
-  return createAuctionDataFromAuction(auctionId, auction);
+  if (!contract) contract = getMarketplaceContract();
+  const auction = await contractCall('auctions', [auctionId], contract); //    contract.auctions(auctionId);
+  return bscParseAuction(auctionId, auction);
 }
 
 /**
@@ -60,7 +62,7 @@ export async function loadAuctionDataBlockchain(
   const auction = await contract.auctions(id);
 
   // convert to object
-  const auctionData: AuctionData = createAuctionDataFromAuction(id, auction);
+  const auctionData: AuctionData = bscParseAuction(id, auction);
 
   // console.log('auction raw data');
   // console.log(auction);
@@ -68,20 +70,20 @@ export async function loadAuctionDataBlockchain(
   // add in extra data
   // lastPrice
   auctionData.lastPrice = await bscGetLastPrice(
-    contract,
     auction.nftToken,
-    auction.nftTokenId.toString()
+    auction.nftTokenId.toString(),
+    contract
   );
 
   // lastToken
   auctionData.lastToken = await bscGetLastToken(
-    contract,
     auction.nftToken,
-    auction.nftTokenId.toString()
+    auction.nftTokenId.toString(),
+    contract
   );
 
   // finalHighestBid
-  auctionData.finalHighestBid = await bscGetFinalHighestBid(contract, id);
+  auctionData.finalHighestBid = await bscGetFinalHighestBid(id, contract);
 
   if (includeNftData) {
     const nftData = await loadNftData(
@@ -106,18 +108,18 @@ export async function bscGetCompleteAuctionData(
   // create auction data from scratch
   const contract: Contract = getMarketplaceContract();
   // load main auction data
-  const auctionData: AuctionData = await bscGetAuction(contract, auctionId);
+  const auctionData: AuctionData = await bscGetAuction(auctionId, contract);
   // load lastPrice
   auctionData.lastPrice = await bscGetLastPrice(
-    contract,
     auctionData.nftToken,
-    auctionData.nftTokenId.toString()
+    auctionData.nftTokenId.toString(),
+    contract
   );
   // lastToken
   auctionData.lastToken = await bscGetLastToken(
-    contract,
     auctionData.nftToken,
-    auctionData.nftTokenId.toString()
+    auctionData.nftTokenId.toString(),
+    contract
   );
   // highest bid and final highest bid are 0 if a list event
   if (onList) {
@@ -130,18 +132,31 @@ export async function bscGetCompleteAuctionData(
       auctionData
     );
     auctionData.finalHighestBid = await bscGetFinalHighestBid(
-      contract,
-      auctionId
+      auctionId,
+      contract
     );
   }
   // load nft data
-  const nftData = await loadNftData(
-    auctionData.nftToken,
-    auctionData.nftTokenId
-  );
-  auctionData.nftData = { ...nftData };
+  try {
+    const nftData = await loadNftData(
+      auctionData.nftToken,
+      auctionData.nftTokenId
+    );
+    auctionData.nftData = { ...nftData };
+    return auctionData;
+  } catch (err: any) {
+    reportError(
+      'getNftData',
+      err,
+      'auctionData: ' + JSON.stringify(auctionData)
+    );
 
-  return auctionData;
+    // console.error(
+    //   'getNftData, error occurred. relevant data:\n' +
+    //     JSON.stringify(auctionData)
+    // );
+    throw err;
+  }
 }
 
 /**
@@ -152,15 +167,20 @@ export async function bscGetCompleteAuctionData(
  * @returns
  */
 export async function bscGetLastPrice(
-  contract: Contract,
   nftToken: string,
-  nftTokenId: string
+  nftTokenId: string,
+  contract?: Contract
 ) {
   // console.log('last price: ' + nftToken + ', ' + nftTokenId);
-  const lastPrice = await contract.lastPrice(nftToken, nftTokenId);
+  if (!contract) contract = getMarketplaceContract();
+  const lastPrice = await contractCall(
+    'lastPrice',
+    [nftToken, nftTokenId],
+    contract
+  ); //   contract.lastPrice(nftToken, nftTokenId);
   // console.log('last price raw data:');
   // console.log(lastPrice);
-  return parseFloat(Web3.utils.fromWei(lastPrice.toString(), 'ether'));
+  return bscWeiToFloat(lastPrice);
 }
 
 /**
@@ -171,11 +191,16 @@ export async function bscGetLastPrice(
  * @returns
  */
 export async function bscGetLastToken(
-  contract: Contract,
   nftToken: string,
-  nftTokenId: string
+  nftTokenId: string,
+  contract?: Contract
 ) {
-  const lastToken = await contract.lastToken(nftToken, nftTokenId);
+  if (!contract) contract = getMarketplaceContract();
+  const lastToken = await contractCall(
+    'lastToken',
+    [nftToken, nftTokenId],
+    contract
+  ); //  contract.lastToken(nftToken, nftTokenId);
   // console.log('last token raw data:');
   // console.log(lastToken);
   return lastToken;
@@ -188,13 +213,18 @@ export async function bscGetLastToken(
  * @returns
  */
 export async function bscGetFinalHighestBid(
-  contract: Contract,
-  auctionId: number
+  auctionId: number,
+  contract?: Contract
 ) {
-  const finalHighestBid = await contract.finalHighestBid(auctionId);
+  if (!contract) contract = getMarketplaceContract();
+  const finalHighestBid = await contractCall(
+    'finalHighestBid',
+    [auctionId],
+    contract
+  ); // await contract.finalHighestBid(auctionId);
   // console.log('final highest bid raw data:');
   // console.log(finalHighestBid);
-  return parseFloat(Web3.utils.fromWei(finalHighestBid.toString(), 'ether'));
+  return bscWeiToFloat(finalHighestBid);
 }
 
 /**
@@ -204,15 +234,20 @@ export async function bscGetFinalHighestBid(
  * @param address
  */
 export async function bscGetBidBalance(
-  contract: Contract,
   auctionId: number,
-  address: string
+  address: string,
+  contract?: Contract
 ) {
-  const balance_ = await contract.bidBalance(auctionId, address);
-  const balance = parseFloat(Web3.utils.fromWei(balance_.toString(), 'ether'));
+  if (!contract) contract = getMarketplaceContract();
+  const balance_ = await contractCall(
+    'bidBalance',
+    [auctionId, address],
+    contract
+  ); // contract.bidBalance(auctionId, address);
+  const balance = bscWeiToFloat(balance_);
 
   // update in db, why not
-  await saveBidBalance(auctionId, address, balance);
+  // await saveBidBalance(auctionId, address, balance);
 
   return balance;
 }
@@ -223,12 +258,13 @@ export async function bscGetBidBalance(
  * @param address
  */
 export async function bscGetUserBidsLength(
-  contract: Contract,
-  address: string
+  address: string,
+  contract?: Contract
 ) {
-  const numBids = await contract.getUserBidsLength(address);
-  console.log(numBids);
-  return parseInt(numBids.toString());
+  if (!contract) contract = getMarketplaceContract();
+  const numBids = await contractCall('getUserBidsLength', [address], contract); // await contract.getUserBidsLength(address);
+  // console.log(numBids);
+  return bscParseInt(numBids);
 }
 
 /**
@@ -237,8 +273,9 @@ export async function bscGetUserBidsLength(
  * @param address
  * @returns
  */
-export async function bscGetUserBids(contract: Contract, address: string) {
-  const numBids = await bscGetUserBidsLength(contract, address);
+export async function bscGetUserBids(address: string, contract?: Contract) {
+  if (!contract) contract = getMarketplaceContract();
+  const numBids = await bscGetUserBidsLength(address, contract);
   const batchSize = 20;
 
   // get the bids in batches
@@ -247,7 +284,11 @@ export async function bscGetUserBids(contract: Contract, address: string) {
     bids: [],
   };
   for (let cursor = 0; cursor < numBids; cursor += batchSize) {
-    const bids: any[] = await contract.getUserBids(address, cursor, batchSize);
+    const bids: any[] = await contractCall(
+      'getUserBids',
+      [address, cursor, batchSize],
+      contract
+    ); // await contract.getUserBids(address, cursor, batchSize);
 
     // console.log(bids);
     const numBidsInBatch = bids[0].length;
@@ -259,8 +300,8 @@ export async function bscGetUserBids(contract: Contract, address: string) {
     // add the batch to the result list
     for (let i = 0; i < numBidsInBatch; i++) {
       result.bids.push({
-        auctionId: parseInt(auctionId_[i].toString()),
-        amount: parseFloat(Web3.utils.fromWei(amount_[i].toString(), 'ether')),
+        auctionId: bscParseInt(auctionId_[i]),
+        amount: bscWeiToFloat(amount_[i]),
       });
     }
   }
@@ -282,15 +323,15 @@ export async function bscGetHighestBid(
 ) {
   const auctionData = auctionData_
     ? auctionData_
-    : await bscGetAuction(contract, auctionId);
+    : await bscGetAuction(auctionId, contract);
 
   if (!auctionData.isSettled) {
     // auction still running, grab bid balance for highest bidder
     if (auctionData.highestBidder != NULL_ADDRESS) {
       const result = await bscGetBidBalance(
-        contract,
         auctionId,
-        auctionData.highestBidder
+        auctionData.highestBidder,
+        contract
       );
       return result;
     } else {
@@ -299,7 +340,7 @@ export async function bscGetHighestBid(
     }
   } else {
     // auction not running, use finalhighestbid
-    const result = await bscGetFinalHighestBid(contract, auctionId);
+    const result = await bscGetFinalHighestBid(auctionId, contract);
     return result;
   }
 }
@@ -469,61 +510,11 @@ export async function loadNftData(nftToken: string, nftTokenId: number) {
 }
 
 /**
- * convert blockchain auction type to AuctionData
- * @param auctionId
- * @param auction
- * @returns
- */
-export function createAuctionDataFromAuction(
-  auctionId: number,
-  auction: any
-): AuctionData {
-  const {
-    nftToken,
-    nftTokenId,
-    owner,
-    token,
-    targetPrice,
-    reservePrice,
-    endTime,
-    minIncrement,
-    isSettled,
-    highestBidder,
-    auctionType,
-    isSold,
-  } = auction;
-
-  const ret: AuctionData = {
-    auctionId,
-    nftToken,
-    nftTokenId: parseInt(nftTokenId.toString()),
-    owner,
-    token,
-    targetPrice: parseFloat(
-      Web3.utils.fromWei(targetPrice.toString(), 'ether')
-    ),
-    reservePrice: parseFloat(
-      Web3.utils.fromWei(reservePrice.toString(), 'ether')
-    ),
-    endTime: parseInt(endTime.toString()),
-    minIncrement: parseFloat(
-      Web3.utils.fromWei(minIncrement.toString(), 'ether')
-    ),
-    isSettled,
-    highestBidder,
-    auctionType,
-    isSold,
-  };
-  return ret;
-}
-
-/**
  * refresh user's bids in db from the blockchain
  * @param address
  */
 export async function refreshUserBids(address: string) {
-  const contract = getMarketplaceContract();
-  const userBids: UserBids = await bscGetUserBids(contract, address);
+  const userBids: UserBids = await bscGetUserBids(address);
   await saveUserBids(userBids);
 }
 
@@ -546,7 +537,7 @@ export async function refreshAuction(id: number) {
 
     // compare with data from from blockchain
     const contract: Contract = getMarketplaceContract();
-    const auctionData: AuctionData = await bscGetAuction(contract, id);
+    const auctionData: AuctionData = await bscGetAuction(id, contract);
     let changed = false;
     if (!existingData.isSold && auctionData.isSold) {
       // we missed a sold event
@@ -559,9 +550,9 @@ export async function refreshAuction(id: number) {
       existingData.lastPrice = highestBid;
 
       existingData.lastToken = await bscGetLastToken(
-        contract,
         existingData.nftToken,
-        existingData.nftTokenId.toString()
+        existingData.nftTokenId.toString(),
+        contract
       );
 
       await saveBidBalance(id, auctionData.highestBidder, 0);
@@ -615,4 +606,131 @@ export async function refreshAuction(id: number) {
 
     if (changed) await saveAuctionData(existingData);
   }
+}
+
+/**
+ * convert wei in bignumber to ETH in float (18 decimals)
+ * @param input
+ * @returns
+ */
+export function bscWeiToFloat(input: BigNumber): number {
+  return parseFloat(Web3.utils.fromWei(input.toString(), 'ether'));
+}
+
+/**
+ * convert bignumber to int
+ * @param input
+ * @returns
+ */
+export function bscParseInt(input: BigNumber): number {
+  return parseInt(input.toString());
+}
+
+/**
+ * convert blockchain auction type to AuctionData
+ * @param auctionId
+ * @param auction
+ * @returns
+ */
+export function bscParseAuction(auctionId: number, auction: any): AuctionData {
+  const {
+    nftToken,
+    nftTokenId,
+    owner,
+    token,
+    targetPrice,
+    reservePrice,
+    endTime,
+    minIncrement,
+    isSettled,
+    highestBidder,
+    auctionType,
+    isSold,
+  } = auction;
+
+  const ret: AuctionData = {
+    auctionId,
+    nftToken,
+    nftTokenId: bscParseInt(nftTokenId),
+    owner,
+    token,
+    targetPrice: bscWeiToFloat(targetPrice),
+    reservePrice: bscWeiToFloat(reservePrice),
+    endTime: bscParseInt(endTime),
+    minIncrement: bscWeiToFloat(minIncrement),
+    isSettled,
+    highestBidder,
+    auctionType,
+    isSold,
+  };
+
+  if (nftToken == NULL_ADDRESS) {
+    console.error(
+      'parseAuction: nft token should not be 0\n' +
+        JSON.stringify(auction) +
+        '\n' +
+        JSON.stringify(ret)
+    );
+  }
+  return ret;
+}
+
+/**
+ * report an error to the console. outputs message and stack fields if they exist
+ * @param err
+ * @param baseMsg prepended to the message
+ * @returns
+ */
+export function reportError(
+  err: any,
+  baseMsg?: string,
+  postMsg?: string
+): string {
+  let output = baseMsg ? baseMsg : '';
+  output += ': error encountered';
+  if (err.mesesage) {
+    output += '\n' + err.message;
+  }
+  if (err.stack) {
+    output += '\n' + err.stack;
+  }
+  if (postMsg) {
+    output += '\n' + postMsg;
+  }
+  console.error(output);
+  return output;
+}
+
+export async function contractCall(
+  fnName: string,
+  args?: any[],
+  contract?: Contract,
+  retries: number = 1
+) {
+  while (retries > 0) {
+    try {
+      console.info(
+        `contractCall:${fnName}: args=${JSON.stringify(
+          args
+        )}, retries=${retries}`
+      );
+      if (!contract) contract = getMarketplaceContract();
+      let result = await (contract[fnName] as Function).apply(contract, args);
+      return result;
+    } catch (err: any) {
+      reportError(
+        err,
+        'contractCall:' + fnName,
+        `args=${JSON.stringify(args)}, retries=${retries}`
+      );
+      retries--;
+      if (retries > 0) {
+        // retry with a new contract instance
+        contract = undefined;
+      }
+    }
+  }
+  throw new Error(
+    'contractCall:' + fnName + ', failed. args: ' + JSON.stringify(args)
+  );
 }

@@ -45,9 +45,9 @@ async function startServer() {
     console.info('Press Ctrl+C to quit.');
   });
 
-  setInterval(function () {
-    console.log('ping');
-  }, 1000 * 60);
+  // setInterval(function () {
+  //   console.log('ping');
+  // }, 1000 * 60);
 
   return app;
 }
