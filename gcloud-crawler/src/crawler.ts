@@ -8,7 +8,7 @@ import Web3Manager from './Web3Manager';
 /**
  * listen for events from the blockchain
  */
-export const registerForEvents = () => {
+export const setupCrawler = () => {
   const marketplace = utils.getMarketplaceContract();
 
   console.log('registering for blockchain events');
@@ -85,6 +85,8 @@ export const registerForEvents = () => {
 
     await processEmergencyWithdrawal(auctionId, highestBidder);
   });
+
+  return manager;
 };
 
 export const processList = async (auctionId: number) => {
@@ -94,8 +96,7 @@ export const processList = async (auctionId: number) => {
   try {
     // create data from scratch
     const auctionData: AuctionData = await utils.bscGetCompleteAuctionData(
-      auctionId,
-      false
+      auctionId
     );
 
     // save to database

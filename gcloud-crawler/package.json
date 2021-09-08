@@ -1,6 +1,6 @@
 {
-  "name": "auto-shark-default",
-  "description": "autoshark api web service",
+  "name": "auto-shark-crawler",
+  "description": "crawls blockchain for events to sync to our database",
   "version": "0.0.2",
   "private": true,
   "license": "Apache-2.0",
@@ -17,9 +17,8 @@
     "build": "tsc",
     "test": "mocha --exit test/*.test.js",
     "serve": "npm run build && npm start",
-    "logs": "gcloud app logs tail -s default",
-    "deploy": "npm run build && gcloud app deploy & gcloud app browse",
-    "deploycron": "gcloud app deploy cron.yaml"
+    "logs": "gcloud app logs tail -s crawler",
+    "deploy": "npm run build && gcloud app deploy & gcloud app browse -s crawler"
   },
   "dependencies": {
     "@google-cloud/logging": "^9.5.5",

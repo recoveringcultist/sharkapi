@@ -3,7 +3,7 @@ import { Contract } from 'web3-eth-contract';
 import { MARKETPLACE_CONTRACT } from './constants';
 import * as MarketplaceABI from './NftMarketplace.json';
 import * as utils from './utils';
-import * as events from './events';
+import * as crawler from './crawler';
 import * as admin from 'firebase-admin';
 
 export default class Web3Manager {
@@ -12,8 +12,9 @@ export default class Web3Manager {
   private _provider;
   private _contract: Contract;
   private _lastBlockProcessed: number = 0;
-  private _maxBatchSize: number = 100;
+  private _maxBatchSize: number;
   private _processing: boolean = false;
+  private _intervalMillis: number;
 
   log(msg: string) {
     console.log(Web3Manager.NAME + ': ' + msg);
@@ -67,18 +68,21 @@ export default class Web3Manager {
 
   destroyConnection() {}
 
-  constructor() {
+  constructor(intervalMillis: number = 5000, maxBatchSize: number = 100) {
     const { web3, contract, provider } = this.initConnection();
     this._web3 = web3;
     this._contract = contract;
     this._provider = provider;
+
+    this._intervalMillis = intervalMillis;
+    this._maxBatchSize = maxBatchSize;
 
     const db = admin.database();
     db.ref('/lastBlockProcessed').once('value', (data) => {
       this._lastBlockProcessed = data.val();
       this.log('startup, last block processed=' + this._lastBlockProcessed);
 
-      setInterval(async () => this.processInterval(), 5000);
+      setInterval(async () => this.processInterval(), this._intervalMillis);
       this.setupListeners();
     });
   }
@@ -239,14 +243,14 @@ export default class Web3Manager {
 
   async processList(values) {
     const auctionId = utils.bscParseInt(values.auctionId);
-    await events.processList(auctionId);
+    await crawler.processList(auctionId);
   }
 
   async processBid(values) {
     const auctionId = utils.bscParseInt(values.auctionId);
     const amount = utils.bscWeiToFloat(values.amount);
     const highestBidder = values.highestBidder;
-    await events.processBid(auctionId, amount, highestBidder);
+    await crawler.processBid(auctionId, amount, highestBidder);
   }
 
   async processSold(values) {
@@ -255,25 +259,25 @@ export default class Web3Manager {
     const token = values.token;
     const highestBidder = values.highestBidder;
 
-    await events.processSold(auctionId, salesPrice, token, highestBidder);
+    await crawler.processSold(auctionId, salesPrice, token, highestBidder);
   }
 
   async processWithdrawAll(values) {
     const auctionId: number = utils.bscParseInt(values.auctionId);
     const account = values.account;
 
-    await events.processWithdrawAll(auctionId, account);
+    await crawler.processWithdrawAll(auctionId, account);
   }
 
   async processCloseAuction(values) {
     const auctionId: number = utils.bscParseInt(values.auctionId);
     const highestBidder = values.highestBidder;
-    await events.processCloseAuction(auctionId, highestBidder);
+    await crawler.processCloseAuction(auctionId, highestBidder);
   }
 
   async processEmergencyWithdrawal(values) {
     const auctionId: number = utils.bscParseInt(values.auctionId);
     const highestBidder = values.highestBidder;
-    await events.processEmergencyWithdrawal(auctionId, highestBidder);
+    await crawler.processEmergencyWithdrawal(auctionId, highestBidder);
   }
 }

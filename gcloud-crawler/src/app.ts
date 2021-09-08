@@ -2,7 +2,7 @@
 
 import express from 'express';
 import cors from 'cors';
-import { createApiRoutes } from './api';
+import { setupCrawler } from './crawler';
 
 import * as admin from 'firebase-admin';
 const serviceAccount = require('../cert/auto-shark-firebase-adminsdk-wfxle-31eb7a6ea3.json');
@@ -12,7 +12,6 @@ async function startServer() {
     credential: admin.credential.cert(serviceAccount),
     databaseURL: 'https://auto-shark-default-rtdb.firebaseio.com/',
   });
-  const firestore = admin.firestore();
 
   const app = express();
   app.use(cors());
@@ -22,9 +21,8 @@ async function startServer() {
   });
 
   app.get('/', (req, res) => {
-    res.status(200).send('sharkapi').end();
+    res.status(200).send('crawler').end();
   });
-  createApiRoutes(app);
 
   // error handler
   app.use((err, req, res, next) => {
@@ -37,15 +35,13 @@ async function startServer() {
   });
 
   // Start the server
-  const PORT = process.env.PORT || 8080;
+  const PORT = process.env.PORT || 8081;
   app.listen(PORT, () => {
-    console.info(`App listening on port ${PORT}`);
+    console.info(`Crawler listening on port ${PORT}`);
     console.info('Press Ctrl+C to quit.');
-  });
 
-  // setInterval(function () {
-  //   console.log('ping');
-  // }, 1000 * 60);
+    setupCrawler();
+  });
 
   return app;
 }
