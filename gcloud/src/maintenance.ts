@@ -3,6 +3,7 @@ import Web3 from 'web3';
 import * as admin from 'firebase-admin';
 import { Contract } from 'ethers';
 import { AuctionData } from './AuctionData';
+import { COLLNAME_AUCTION } from './constants';
 
 export const maintenance1 = async (req, res, next) => {
   const convert = (input: number) => {
@@ -12,7 +13,7 @@ export const maintenance1 = async (req, res, next) => {
 
   const firestore = admin.firestore();
   const snap = await firestore
-    .collection(utils.COLLNAME_AUCTION)
+    .collection(COLLNAME_AUCTION)
     .where('finalHighestBid', '>', 100000)
     .get();
   for (const doc of snap.docs) {
@@ -22,7 +23,7 @@ export const maintenance1 = async (req, res, next) => {
     data.finalHighestBid = convert(data.finalHighestBid);
     data.lastPrice = convert(data.lastPrice);
     data.highestBid = convert(data.highestBid);
-    await firestore.doc(utils.COLLNAME_AUCTION + '/' + doc.id).set(data);
+    await firestore.doc(COLLNAME_AUCTION + '/' + doc.id).set(data);
   }
   res.send('success');
 };
@@ -35,7 +36,7 @@ export const maintenance1 = async (req, res, next) => {
  */
 export const temp = async (req, res, next) => {
   const firestore = admin.firestore();
-  const snap = await firestore.collection(utils.COLLNAME_AUCTION).get();
+  const snap = await firestore.collection(COLLNAME_AUCTION).get();
   const contract: Contract = utils.getMarketplaceContract();
   try {
     console.log(`checking ${snap.size} documents`);

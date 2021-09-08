@@ -11,6 +11,7 @@ const serviceAccount = require('../cert/auto-shark-firebase-adminsdk-wfxle-31eb7
 async function startServer() {
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
+    databaseURL: 'https://auto-shark-default-rtdb.firebaseio.com/',
   });
   const firestore = admin.firestore();
 

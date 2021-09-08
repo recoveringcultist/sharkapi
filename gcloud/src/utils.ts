@@ -1,22 +1,21 @@
 import { BigNumber, Contract, providers } from 'ethers';
 import Web3 from 'web3';
-import { AuctionData, AUCTION_FIELDS, NftData } from './AuctionData';
+import { AuctionData, NftData } from './AuctionData';
 import * as MarketplaceABI from './NftMarketplace.json';
 import fetch from 'node-fetch';
 import * as admin from 'firebase-admin';
-import { UserBids } from './UserBids';
+import { UserBidInfo, UserBids, UserBidsInfo } from './UserBids';
+import {
+  COLLNAME_AUCTION,
+  COLLNAME_BIDBALANCE,
+  COLLNAME_USERBIDS,
+  HAMMER_NFT,
+  NULL_ADDRESS,
+  RPC_URL,
+  SHARK_NFT,
+} from './constants';
 
-export const HAMMER_NFT: string = '0xcA56AF4bde480B3c177E1A4115189F261C2af034';
-export const SHARK_NFT: string = '0x13e14f6EC8fee53b69eBd4Bd69e35FFCFe8960DE';
-export const COLLNAME_AUCTION: string = 'auctiondata';
-export const COLLNAME_BIDBALANCE: string = 'bidbalance';
-export const COLLNAME_USERBIDS: string = 'userbids';
-
-export const NULL_ADDRESS: string =
-  '0x0000000000000000000000000000000000000000';
-
-export const getRpcPRovider = () =>
-  new providers.JsonRpcProvider('https://bsc-dataseed.binance.org/');
+export const getRpcPRovider = () => new providers.JsonRpcProvider(RPC_URL);
 
 export const getMarketplaceContract = () =>
   new Contract(
@@ -414,6 +413,40 @@ export async function getUserBids(address: string): Promise<UserBids> {
 }
 
 /**
+ * load userBids data from db with auction info
+ * @param id
+ * @returns
+ */
+export async function getUserBidsInfo(address: string): Promise<UserBidsInfo> {
+  const firestore = admin.firestore();
+
+  const snap = await firestore.doc(`${COLLNAME_USERBIDS}/${address}`).get();
+  if (snap.exists) {
+    let bids: UserBidInfo[] = [];
+    let userBids: UserBids = snap.data() as UserBids;
+    for (const bid of userBids.bids) {
+      let auctionData = await getAuctionData(bid.auctionId);
+      bids.push({
+        auctionId: bid.auctionId,
+        amount: bid.amount,
+        auctionData,
+      });
+    }
+    let result: UserBidsInfo = {
+      address: userBids.address,
+      bids,
+    };
+
+    return result;
+  } else {
+    return {
+      address,
+      bids: [],
+    };
+  }
+}
+
+/**
  * save userbids to db
  * @param userBids
  * @returns
@@ -613,8 +646,9 @@ export async function refreshAuction(id: number) {
  * @param input
  * @returns
  */
-export function bscWeiToFloat(input: BigNumber): number {
-  return parseFloat(Web3.utils.fromWei(input.toString(), 'ether'));
+export function bscWeiToFloat(input: BigNumber | string): number {
+  if (input instanceof BigNumber) input = input.toString();
+  return parseFloat(Web3.utils.fromWei(input, 'ether'));
 }
 
 /**
@@ -622,8 +656,9 @@ export function bscWeiToFloat(input: BigNumber): number {
  * @param input
  * @returns
  */
-export function bscParseInt(input: BigNumber): number {
-  return parseInt(input.toString());
+export function bscParseInt(input: BigNumber | string): number {
+  if (input instanceof BigNumber) input = input.toString();
+  return parseInt(input);
 }
 
 /**

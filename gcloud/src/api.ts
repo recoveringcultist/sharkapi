@@ -8,6 +8,7 @@ import {
   AUCTION_FIELDS,
   AUCTION_FIELD_TYPES,
 } from './AuctionData';
+import { COLLNAME_AUCTION } from './constants';
 import * as MarketplaceABI from './NftMarketplace.json';
 import { UserBids } from './UserBids';
 import * as utils from './utils';
@@ -19,6 +20,7 @@ export const createApiRoutes = (app) => {
   app.get('/api/auction', api);
   app.get('/api/bidbalanceuser/:address', bidBalanceUser);
   app.get('/api/userbids/:address', userBids);
+  app.get('/api/userbidsinfo/:address', userBidsInfo);
   app.get('/api/userbidsrefresh/:address', userBidsRefresh);
   app.get('/api/refreshcron', refreshCron);
   app.get('/api/bsc/auctionslength', bscAuctionsLength);
@@ -197,9 +199,7 @@ const api = async (req, res, next) => {
     }
 
     // create query
-    let query: FirebaseFirestore.Query = firestore.collection(
-      utils.COLLNAME_AUCTION
-    );
+    let query: FirebaseFirestore.Query = firestore.collection(COLLNAME_AUCTION);
 
     // where clauses
     if (Object.keys(whereClauses).length > 0) {
@@ -377,6 +377,25 @@ const userBids = async (req, res, next) => {
     if (address == null) throw new Error('no address');
 
     const result = await utils.getUserBids(address);
+    res.json(result);
+  } catch (err) {
+    return next(err);
+  }
+};
+
+/**
+ * get userBids info from database including auction data
+ * @param req
+ * @param res
+ * @param next
+ * @returns
+ */
+const userBidsInfo = async (req, res, next) => {
+  try {
+    const address: string = req.params.address;
+    if (address == null) throw new Error('no address');
+
+    const result = await utils.getUserBidsInfo(address);
     res.json(result);
   } catch (err) {
     return next(err);
