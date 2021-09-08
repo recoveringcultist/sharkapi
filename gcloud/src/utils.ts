@@ -705,9 +705,9 @@ export async function contractCall(
   fnName: string,
   args?: any[],
   contract?: Contract,
-  retries: number = 1
+  retries: number = 2
 ) {
-  while (retries > 0) {
+  while (retries >= 0) {
     try {
       console.info(
         `contractCall:${fnName}: args=${JSON.stringify(
@@ -724,7 +724,7 @@ export async function contractCall(
         `args=${JSON.stringify(args)}, retries=${retries}`
       );
       retries--;
-      if (retries > 0) {
+      if (retries >= 0) {
         // retry with a new contract instance
         contract = undefined;
       }
