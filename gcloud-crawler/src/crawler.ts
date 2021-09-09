@@ -7,7 +7,7 @@ import * as utils from '../../gcloud/src/common/utils';
 import Web3Manager from './Web3Manager';
 
 /**
- * listen for events from the blockchain
+ * query blockchain events continually over time and sync them to firebase db
  */
 export const setupCrawler = () => {
   const marketplace = utils.getMarketplaceContract();
