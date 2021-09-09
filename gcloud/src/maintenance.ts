@@ -1,9 +1,9 @@
-import * as utils from './utils';
+import * as utils from './common/utils';
 import Web3 from 'web3';
 import * as admin from 'firebase-admin';
 import { Contract } from 'ethers';
-import { AuctionData } from './AuctionData';
-import { COLLNAME_AUCTION } from './constants';
+import { AuctionData } from './common/AuctionData';
+import { COLLNAME_AUCTION } from './common/constants';
 
 export const maintenance1 = async (req, res, next) => {
   const convert = (input: number) => {

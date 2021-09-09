@@ -1,6 +1,6 @@
 {
   "name": "auto-shark-crawler",
-  "description": "crawls blockchain for events to sync to our database",
+  "description": "app engine crawler service for autoshark api. continually syncs blockchain events to our database.",
   "version": "0.0.2",
   "private": true,
   "license": "Apache-2.0",

@@ -1,8 +1,9 @@
-import { Contract } from 'ethers';
-import Web3 from 'web3';
-import { AuctionData } from './AuctionData';
-import { NULL_ADDRESS } from './constants';
-import * as utils from './utils';
+// common files
+import { AuctionData } from '../../gcloud/src/common/AuctionData';
+import { NULL_ADDRESS } from '../../gcloud/src/common/constants';
+import * as utils from '../../gcloud/src/common/utils';
+
+// other imports
 import Web3Manager from './Web3Manager';
 
 /**

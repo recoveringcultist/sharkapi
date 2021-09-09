@@ -1,6 +1,6 @@
 {
   "name": "auto-shark-default",
-  "description": "autoshark api web service",
+  "description": "app engine default service for autoshark api. handles api requests from users.",
   "version": "0.0.2",
   "private": true,
   "license": "Apache-2.0",

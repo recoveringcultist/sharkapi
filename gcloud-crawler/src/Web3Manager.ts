@@ -1,8 +1,11 @@
+// common files
+import { MARKETPLACE_CONTRACT } from '../../gcloud/src/common/constants';
+import * as MarketplaceABI from '../../gcloud/src/common/NftMarketplace.json';
+import * as utils from '../../gcloud/src/common/utils';
+
+// other imports
 import Web3 from 'web3';
 import { Contract } from 'web3-eth-contract';
-import { MARKETPLACE_CONTRACT } from './constants';
-import * as MarketplaceABI from './NftMarketplace.json';
-import * as utils from './utils';
 import * as crawler from './crawler';
 import * as admin from 'firebase-admin';
 

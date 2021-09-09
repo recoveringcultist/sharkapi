@@ -1,15 +1,19 @@
+// package imports
 import { BigNumber, Contract, providers } from 'ethers';
 import Web3 from 'web3';
-import { AuctionData, NftData } from './AuctionData';
-import * as MarketplaceABI from './NftMarketplace.json';
 import fetch from 'node-fetch';
 import * as admin from 'firebase-admin';
+
+// local imports
+import { AuctionData, NftData } from './AuctionData';
+import * as MarketplaceABI from './NftMarketplace.json';
 import { UserBidInfo, UserBids, UserBidsInfo } from './UserBids';
 import {
   COLLNAME_AUCTION,
   COLLNAME_BIDBALANCE,
   COLLNAME_USERBIDS,
   HAMMER_NFT,
+  MARKETPLACE_CONTRACT,
   NULL_ADDRESS,
   RPC_URL,
   SHARK_NFT,
@@ -18,11 +22,7 @@ import {
 export const getRpcPRovider = () => new providers.JsonRpcProvider(RPC_URL);
 
 export const getMarketplaceContract = () =>
-  new Contract(
-    '0x7579Cc6c2edC67Cf446bA11C4FfFae874A6808C0',
-    MarketplaceABI.abi as any,
-    getRpcPRovider()
-  );
+  new Contract(MARKETPLACE_CONTRACT, MarketplaceABI.abi, getRpcPRovider());
 
 /**
  * BSC: get total number of auctions

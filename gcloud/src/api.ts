@@ -1,17 +1,8 @@
-import { differenceInMinutes, differenceInSeconds } from 'date-fns';
-import { Contract, providers } from 'ethers';
+import { differenceInSeconds } from 'date-fns';
 import * as admin from 'firebase-admin';
-import { firestore } from 'firebase-admin';
-import Web3 from 'web3';
-import {
-  AuctionData,
-  AUCTION_FIELDS,
-  AUCTION_FIELD_TYPES,
-} from './AuctionData';
-import { COLLNAME_AUCTION } from './constants';
-import * as MarketplaceABI from './NftMarketplace.json';
-import { UserBids } from './UserBids';
-import * as utils from './utils';
+import { AuctionData, AUCTION_FIELD_TYPES } from './common/AuctionData';
+import { COLLNAME_AUCTION } from './common/constants';
+import * as utils from './common/utils';
 
 export const createApiRoutes = (app) => {
   app.get('/api/auctionraw/:id', auctionRaw);
