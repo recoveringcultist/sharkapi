@@ -48,54 +48,6 @@ export async function bscGetAuction(auctionId: number, contract?: Contract) {
 }
 
 /**
- * load auction from blockchain, add nftdata from api
- * @param id
- * @returns
- */
-export async function loadAuctionDataBlockchain(
-  id: number,
-  includeNftData: boolean = true
-) {
-  const contract = getMarketplaceContract();
-  // load main auction data
-  const auction = await contract.auctions(id);
-
-  // convert to object
-  const auctionData: AuctionData = bscParseAuction(id, auction);
-
-  // console.log('auction raw data');
-  // console.log(auction);
-
-  // add in extra data
-  // lastPrice
-  auctionData.lastPrice = await bscGetLastPrice(
-    auction.nftToken,
-    auction.nftTokenId.toString(),
-    contract
-  );
-
-  // lastToken
-  auctionData.lastToken = await bscGetLastToken(
-    auction.nftToken,
-    auction.nftTokenId.toString(),
-    contract
-  );
-
-  // finalHighestBid
-  auctionData.finalHighestBid = await bscGetFinalHighestBid(id, contract);
-
-  if (includeNftData) {
-    const nftData = await loadNftData(
-      auctionData.nftToken,
-      auctionData.nftTokenId
-    );
-    auctionData.nftData = { ...nftData };
-  }
-
-  return auctionData;
-}
-
-/**
  * create complete auction data from the blockchain and NFT api, from scratch
  * @param auctionId
  * @param onList if this is a list event or a create-from-scratch-later event
@@ -149,11 +101,6 @@ export async function bscGetCompleteAuctionData(
       err,
       'auctionData: ' + JSON.stringify(auctionData)
     );
-
-    // console.error(
-    //   'getNftData, error occurred. relevant data:\n' +
-    //     JSON.stringify(auctionData)
-    // );
     throw err;
   }
 }
@@ -520,26 +467,33 @@ export async function loadNftData(nftToken: string, nftTokenId: number) {
     default:
       throw new Error('unknown nftToken ' + nftToken);
   }
+
   const url = `https://api.autoshark.finance/api/nft/${which}?tokenId=${nftTokenId}`;
-  const response = await fetch(url);
-  const text = await response.text();
-  try {
-    const json: any = JSON.parse(text);
-    const nftData: NftData = json[0];
-    // console.log('loadNftData: ' + JSON.stringify(nftData));
-    return nftData;
-  } catch (err: any) {
-    console.log(err.message);
-    console.log('loadNftData: error parsing json, received: ' + text);
-    throw new Error(
-      'loadNftData: error parsing json from ' +
-        url +
-        '. error message was ' +
-        err.message +
-        ', original server response: ' +
-        text
-    );
+  let retries = 2;
+  while (retries >= 0) {
+    let response, text;
+
+    try {
+      response = await fetch(url);
+      text = await response.text();
+      const json: any = JSON.parse(text);
+      const nftData: NftData = json[0];
+      // console.log('loadNftData: ' + JSON.stringify(nftData));
+      return nftData;
+    } catch (err: any) {
+      reportError(
+        err,
+        'loadNftData',
+        'url: ' +
+          url +
+          ', ' +
+          retries +
+          ' retries left, response received from server: ' +
+          text
+      );
+    }
   }
+  throw new Error('could could not get NFT data');
 }
 
 /**
@@ -556,88 +510,105 @@ export async function refreshUserBids(address: string) {
  * @param id
  */
 export async function refreshAuction(id: number) {
+  let nftToken, nftTokenId;
   // see if it already exists in the database
   let existingData: AuctionData = await getAuctionData(id);
+  const auctionData: AuctionData = await bscGetCompleteAuctionData(id);
   if (!existingData) {
     // it doesn't exist, create from scratch
-    const auctionData: AuctionData = await bscGetCompleteAuctionData(id);
+    nftToken = auctionData.nftToken;
+    nftTokenId = auctionData.nftTokenId;
     await saveAuctionData(auctionData);
   } else {
-    // only refresh the parts that differ from the blockchain, and only if the auction is not settled
-    // if (existingData.isSettled) {
-    //   return;
-    // }
-
-    // compare with data from from blockchain
-    const contract: Contract = getMarketplaceContract();
-    const auctionData: AuctionData = await bscGetAuction(id, contract);
     let changed = false;
-    if (!existingData.isSold && auctionData.isSold) {
-      // we missed a sold event
-      existingData.isSettled = true;
-      existingData.isSold = true;
-      existingData.highestBidder = auctionData.highestBidder;
-      const highestBid = await bscGetHighestBid(contract, id, existingData);
-      existingData.highestBid = highestBid;
-      existingData.finalHighestBid = highestBid;
-      existingData.lastPrice = highestBid;
-
-      existingData.lastToken = await bscGetLastToken(
-        existingData.nftToken,
-        existingData.nftTokenId.toString(),
-        contract
-      );
-
-      await saveBidBalance(id, auctionData.highestBidder, 0);
-
-      changed = true;
-    } else if (!existingData.isSettled && auctionData.isSettled) {
-      // missed an end-of-auction event
-      existingData.isSettled = auctionData.isSettled;
-      existingData.highestBidder = auctionData.highestBidder;
-      changed = true;
-    } else {
-      // miscellaneous fields
-      if (existingData.isSettled != auctionData.isSettled) {
-        existingData.isSettled = auctionData.isSettled;
-        changed = true;
-      }
-      if (existingData.highestBidder != auctionData.highestBidder) {
-        existingData.highestBidder = auctionData.highestBidder;
-        changed = true;
-      }
-
-      const highestBid = await bscGetHighestBid(contract, id, existingData);
-      if (existingData.highestBid != highestBid) {
-        existingData.highestBid = highestBid;
-        changed = true;
-      }
-      if (
-        existingData.isSettled &&
-        existingData.finalHighestBid != highestBid
-      ) {
-        existingData.finalHighestBid = highestBid;
-        changed = true;
-      }
-    }
-
-    // grab existing data from db, overwrite with blockchain data
-    // const existing: AuctionData = await getAuctionData(id);
-    // for (const field of AUCTION_FIELDS) {
-    //   existing[field] = auctionData[field];
-    // }
-
-    // fill in nft data if needed
+    // replace it all from the blockchain except for maybe the nft data
     if (!existingData.nftData) {
-      const nftData = await loadNftData(
-        existingData.nftToken,
-        existingData.nftTokenId
-      );
-      existingData.nftData = { ...nftData };
+      existingData.nftData = auctionData.nftData;
       changed = true;
     }
+    const fieldsToReplace = [
+      'auctionId',
+      'nftToken',
+      'nftTokenId',
+      'owner',
+      'token',
+      'targetPrice',
+      'reservePrice',
+      'endTime',
+      'minIncrement',
+      'isSettled',
+      'highestBidder',
+      'auctionType',
+      'isSold',
+      'lastPrice',
+      'lastToken',
+      'finalHighestBid',
+      'highestBid',
+    ];
+    for (const field of fieldsToReplace) {
+      if (existingData[field] != auctionData[field]) {
+        changed = true;
+        existingData[field] = auctionData[field];
+      }
+    }
+
+    nftToken = existingData.nftToken;
+    nftTokenId = existingData.nftTokenId;
 
     if (changed) await saveAuctionData(existingData);
+  }
+
+  // also refresh last price / last token data for past auctions this nft has been in
+  await refreshLastSaleDataForNft(nftToken, nftTokenId);
+}
+
+/**
+ * get the auctions an nft has been in
+ * @param nftToken
+ * @param nftTokenId
+ * @returns
+ */
+export async function getAuctionsForNft(nftToken: string, nftTokenId: number) {
+  const firestore = admin.firestore();
+  const snap = await firestore
+    .collection(COLLNAME_AUCTION)
+    .where('nftToken', '==', nftToken)
+    .where('nftTokenId', '==', nftTokenId)
+    .orderBy('auctionId')
+    .get();
+  const result: AuctionData[] = [];
+  for (const doc of snap.docs) {
+    result.push(doc.data() as AuctionData);
+  }
+  return result;
+}
+
+/**
+ * refresh all the auctions an nft has been in with the most recent lastPrice and lastToken
+ * @param nftToken
+ * @param nftTokenId
+ */
+export async function refreshLastSaleDataForNft(
+  nftToken: string,
+  nftTokenId: number
+) {
+  const auctions = await getAuctionsForNft(nftToken, nftTokenId);
+
+  const lastPrice = await bscGetLastPrice(nftToken, nftTokenId.toString());
+  const lastToken = await bscGetLastToken(nftToken, nftTokenId.toString());
+
+  for (const auction of auctions) {
+    let changed = false;
+
+    if (auction.lastPrice != lastPrice) {
+      auction.lastPrice = lastPrice;
+      changed = true;
+    }
+    if (auction.lastToken != lastToken) {
+      auction.lastToken = lastToken;
+      changed = true;
+    }
+    if (changed) await saveAuctionData(auction);
   }
 }
 

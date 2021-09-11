@@ -3,6 +3,7 @@ import * as admin from 'firebase-admin';
 import { AuctionData, AUCTION_FIELD_TYPES } from './common/AuctionData';
 import { COLLNAME_AUCTION } from './common/constants';
 import * as utils from './common/utils';
+import { maintenance2 } from './maintenance';
 
 export const createApiRoutes = (app) => {
   app.get('/api/auctionraw/:id', auctionRaw);
@@ -13,6 +14,8 @@ export const createApiRoutes = (app) => {
   app.get('/api/userbids/:address', userBids);
   app.get('/api/userbidsinfo/:address', userBidsInfo);
   app.get('/api/userbidsrefresh/:address', userBidsRefresh);
+  app.get('/api/auctionsfornft/:id/:address', auctionsForNft);
+  app.get('/api/nftsalesdatarefresh/:id/:address', nftSalesDataRefresh);
   app.get('/api/refreshcron', refreshCron);
   app.get('/api/bsc/auctionslength', bscAuctionsLength);
   app.get('/api/bsc/auction/:id', bscAuction);
@@ -21,6 +24,7 @@ export const createApiRoutes = (app) => {
   app.get('/api/bsc/highestbid/:id', bscHighestBid);
   app.get('/api/bsc/getuserbidslength/:address', bscGetUserBidsLength);
   app.get('/api/bsc/getuserbids/:address', bscGetUserBids);
+  app.get('/api/maintenance2', maintenance2);
   // app.get('/api/maintenance1', maintenance1);
   // app.get('/api/tmp', temp);
   // app.get('/api/refreshall', refreshAll);
@@ -29,6 +33,9 @@ export const createApiRoutes = (app) => {
 const api = async (req, res, next) => {
   try {
     const firestore = admin.firestore();
+
+    console.log('headers:');
+    console.log(req.headers);
 
     // console.info(req.query);
 
@@ -277,7 +284,7 @@ const auctionRaw = async (req, res, next) => {
     const auctionData: AuctionData = await utils.bscGetCompleteAuctionData(
       id,
       false
-    ); // await utils.loadAuctionDataBlockchain(id);
+    );
 
     res.json(auctionData);
   } catch (err) {
@@ -408,6 +415,50 @@ const userBidsRefresh = async (req, res, next) => {
 
   try {
     await utils.refreshUserBids(address);
+
+    res.send('success');
+  } catch (err) {
+    return next(err);
+  }
+};
+
+/**
+ * get the auctions an nft has been in
+ * @param req
+ * @param res
+ * @param next
+ * @returns
+ */
+const auctionsForNft = async (req, res, next) => {
+  const id = parseInt(req.params.id);
+  if (req.params.id == null || isNaN(id)) throw new Error('no id');
+  const address: string = req.params.address;
+  if (address == null) throw new Error('no address');
+
+  try {
+    const result = await utils.getAuctionsForNft(address, id);
+
+    res.json(result);
+  } catch (err) {
+    return next(err);
+  }
+};
+
+/**
+ * update the last price and last token data for every auction an nft has been in
+ * @param req
+ * @param res
+ * @param next
+ * @returns
+ */
+const nftSalesDataRefresh = async (req, res, next) => {
+  const id = parseInt(req.params.id);
+  if (req.params.id == null || isNaN(id)) throw new Error('no id');
+  const address: string = req.params.address;
+  if (address == null) throw new Error('no address');
+
+  try {
+    await utils.refreshLastSaleDataForNft(address, id);
 
     res.send('success');
   } catch (err) {

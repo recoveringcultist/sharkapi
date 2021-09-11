@@ -5,6 +5,7 @@ import cors from 'cors';
 import { createApiRoutes } from './api';
 
 import * as admin from 'firebase-admin';
+import Web3Manager from './Web3Manager';
 const serviceAccount = require('../cert/auto-shark-firebase-adminsdk-wfxle-31eb7a6ea3.json');
 
 async function startServer() {

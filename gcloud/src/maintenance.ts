@@ -5,6 +5,36 @@ import { Contract } from 'ethers';
 import { AuctionData } from './common/AuctionData';
 import { COLLNAME_AUCTION } from './common/constants';
 
+/**
+ * look for missed auctions in database
+ * @param req
+ * @param res
+ * @param next
+ * @returns
+ */
+export const maintenance2 = async (req, res, next) => {
+  const firestore = admin.firestore();
+
+  const numAuctions = await utils.bscAuctionsLength();
+  console.log(`there are ${numAuctions} auctions`);
+  const missing: number[] = [];
+
+  for (let i = 0; i < numAuctions; i++) {
+    const snap = await firestore.doc(COLLNAME_AUCTION + '/' + i).get();
+    if (!snap.exists) {
+      console.log(`auction ${i} missing in db`);
+      missing.push(i);
+    } else {
+      console.log(`auction ${i} accounted for`);
+    }
+  }
+
+  console.log(`total auctions missing: ${missing.length}`);
+  console.log(missing);
+
+  return res.json(missing);
+};
+
 export const maintenance1 = async (req, res, next) => {
   const convert = (input: number) => {
     let strval = input.toString();
