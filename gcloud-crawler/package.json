@@ -13,8 +13,8 @@
     "node": ">=14.0.0"
   },
   "scripts": {
-    "start": "node dist/app.js",
-    "build": "tsc",
+    "start": "node dist/gcloud-crawler/src/app.js",
+    "build": "tsc && cp -r cert dist/gcloud-crawler",
     "test": "mocha --exit test/*.test.js",
     "serve": "npm run build && npm start",
     "logs": "gcloud app logs tail -s crawler",
