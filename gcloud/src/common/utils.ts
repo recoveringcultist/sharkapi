@@ -18,6 +18,7 @@ import {
   RPC_URL,
   SHARK_NFT,
 } from './constants';
+import { Logger } from '@google-cloud/logging-bunyan/build/src/middleware/express';
 
 export const getRpcPRovider = () => new providers.JsonRpcProvider(RPC_URL);
 
@@ -28,9 +29,14 @@ export const getMarketplaceContract = () =>
  * BSC: get total number of auctions
  * @returns
  */
-export async function bscAuctionsLength(contract?: Contract) {
+export async function bscAuctionsLength(contract?: Contract, logger?: Logger) {
   if (!contract) contract = getMarketplaceContract();
-  const numAuctions = await contractCall('auctionsLength', undefined, contract);
+  const numAuctions = await contractCall(
+    'auctionsLength',
+    undefined,
+    contract,
+    logger
+  );
 
   return bscParseInt(numAuctions);
 }
@@ -40,10 +46,28 @@ export async function bscAuctionsLength(contract?: Contract) {
  * @param auctionId
  * @param contract
  */
-export async function bscGetAuction(auctionId: number, contract?: Contract) {
+export async function bscGetAuction(
+  auctionId: number,
+  contract?: Contract,
+  logger?: Logger
+) {
   // load main auction data
   if (!contract) contract = getMarketplaceContract();
-  const auction = await contractCall('auctions', [auctionId], contract); //    contract.auctions(auctionId);
+  const auction = await contractCall(
+    'auctions',
+    [auctionId],
+    contract,
+    logger,
+    2,
+    (result) => {
+      if (result.nftToken == NULL_ADDRESS) {
+        throw new Error(
+          `auction validator: nft token should not be ${NULL_ADDRESS}\n` +
+            JSON.stringify(result)
+        );
+      }
+    }
+  );
   return bscParseAuction(auctionId, auction);
 }
 
@@ -54,7 +78,8 @@ export async function bscGetAuction(auctionId: number, contract?: Contract) {
  */
 export async function bscGetCompleteAuctionData(
   auctionId: number,
-  onList: boolean = true
+  onList: boolean = true,
+  logger?: Logger
 ) {
   // create auction data from scratch
   const contract: Contract = getMarketplaceContract();
@@ -64,13 +89,15 @@ export async function bscGetCompleteAuctionData(
   auctionData.lastPrice = await bscGetLastPrice(
     auctionData.nftToken,
     auctionData.nftTokenId.toString(),
-    contract
+    contract,
+    logger
   );
   // lastToken
   auctionData.lastToken = await bscGetLastToken(
     auctionData.nftToken,
     auctionData.nftTokenId.toString(),
-    contract
+    contract,
+    logger
   );
   // highest bid and final highest bid are 0 if a list event
   if (onList) {
@@ -78,20 +105,23 @@ export async function bscGetCompleteAuctionData(
     auctionData.finalHighestBid = 0;
   } else {
     auctionData.highestBid = await bscGetHighestBid(
-      contract,
       auctionId,
-      auctionData
+      auctionData,
+      contract,
+      logger
     );
     auctionData.finalHighestBid = await bscGetFinalHighestBid(
       auctionId,
-      contract
+      contract,
+      logger
     );
   }
   // load nft data
   try {
     const nftData = await loadNftData(
       auctionData.nftToken,
-      auctionData.nftTokenId
+      auctionData.nftTokenId,
+      logger
     );
     auctionData.nftData = { ...nftData };
     return auctionData;
@@ -99,7 +129,8 @@ export async function bscGetCompleteAuctionData(
     reportError(
       'getNftData',
       err,
-      'auctionData: ' + JSON.stringify(auctionData)
+      'auctionData: ' + JSON.stringify(auctionData),
+      logger
     );
     throw err;
   }
@@ -115,14 +146,16 @@ export async function bscGetCompleteAuctionData(
 export async function bscGetLastPrice(
   nftToken: string,
   nftTokenId: string,
-  contract?: Contract
+  contract?: Contract,
+  logger?: Logger
 ) {
   // console.log('last price: ' + nftToken + ', ' + nftTokenId);
   if (!contract) contract = getMarketplaceContract();
   const lastPrice = await contractCall(
     'lastPrice',
     [nftToken, nftTokenId],
-    contract
+    contract,
+    logger
   ); //   contract.lastPrice(nftToken, nftTokenId);
   // console.log('last price raw data:');
   // console.log(lastPrice);
@@ -139,13 +172,15 @@ export async function bscGetLastPrice(
 export async function bscGetLastToken(
   nftToken: string,
   nftTokenId: string,
-  contract?: Contract
+  contract?: Contract,
+  logger?: Logger
 ) {
   if (!contract) contract = getMarketplaceContract();
   const lastToken = await contractCall(
     'lastToken',
     [nftToken, nftTokenId],
-    contract
+    contract,
+    logger
   ); //  contract.lastToken(nftToken, nftTokenId);
   // console.log('last token raw data:');
   // console.log(lastToken);
@@ -160,13 +195,15 @@ export async function bscGetLastToken(
  */
 export async function bscGetFinalHighestBid(
   auctionId: number,
-  contract?: Contract
+  contract?: Contract,
+  logger?: Logger
 ) {
   if (!contract) contract = getMarketplaceContract();
   const finalHighestBid = await contractCall(
     'finalHighestBid',
     [auctionId],
-    contract
+    contract,
+    logger
   ); // await contract.finalHighestBid(auctionId);
   // console.log('final highest bid raw data:');
   // console.log(finalHighestBid);
@@ -182,13 +219,15 @@ export async function bscGetFinalHighestBid(
 export async function bscGetBidBalance(
   auctionId: number,
   address: string,
-  contract?: Contract
+  contract?: Contract,
+  logger?: Logger
 ) {
   if (!contract) contract = getMarketplaceContract();
   const balance_ = await contractCall(
     'bidBalance',
     [auctionId, address],
-    contract
+    contract,
+    logger
   ); // contract.bidBalance(auctionId, address);
   const balance = bscWeiToFloat(balance_);
 
@@ -205,10 +244,16 @@ export async function bscGetBidBalance(
  */
 export async function bscGetUserBidsLength(
   address: string,
-  contract?: Contract
+  contract?: Contract,
+  logger?: Logger
 ) {
   if (!contract) contract = getMarketplaceContract();
-  const numBids = await contractCall('getUserBidsLength', [address], contract); // await contract.getUserBidsLength(address);
+  const numBids = await contractCall(
+    'getUserBidsLength',
+    [address],
+    contract,
+    logger
+  ); // await contract.getUserBidsLength(address);
   // console.log(numBids);
   return bscParseInt(numBids);
 }
@@ -219,9 +264,13 @@ export async function bscGetUserBidsLength(
  * @param address
  * @returns
  */
-export async function bscGetUserBids(address: string, contract?: Contract) {
+export async function bscGetUserBids(
+  address: string,
+  contract?: Contract,
+  logger?: Logger
+) {
   if (!contract) contract = getMarketplaceContract();
-  const numBids = await bscGetUserBidsLength(address, contract);
+  const numBids = await bscGetUserBidsLength(address, contract, logger);
   const batchSize = 20;
 
   // get the bids in batches
@@ -233,7 +282,8 @@ export async function bscGetUserBids(address: string, contract?: Contract) {
     const bids: any[] = await contractCall(
       'getUserBids',
       [address, cursor, batchSize],
-      contract
+      contract,
+      logger
     ); // await contract.getUserBids(address, cursor, batchSize);
 
     // console.log(bids);
@@ -263,13 +313,15 @@ export async function bscGetUserBids(address: string, contract?: Contract) {
  * @returns
  */
 export async function bscGetHighestBid(
-  contract: Contract,
   auctionId: number,
-  auctionData_?: AuctionData
+  auctionData_?: AuctionData,
+  contract?: Contract,
+  logger?: Logger
 ) {
+  if (!contract) contract = getMarketplaceContract();
   const auctionData = auctionData_
     ? auctionData_
-    : await bscGetAuction(auctionId, contract);
+    : await bscGetAuction(auctionId, contract, logger);
 
   if (!auctionData.isSettled) {
     // auction still running, grab bid balance for highest bidder
@@ -277,7 +329,8 @@ export async function bscGetHighestBid(
       const result = await bscGetBidBalance(
         auctionId,
         auctionData.highestBidder,
-        contract
+        contract,
+        logger
       );
       return result;
     } else {
@@ -286,7 +339,7 @@ export async function bscGetHighestBid(
     }
   } else {
     // auction not running, use finalhighestbid
-    const result = await bscGetFinalHighestBid(auctionId, contract);
+    const result = await bscGetFinalHighestBid(auctionId, contract, logger);
     return result;
   }
 }
@@ -455,7 +508,11 @@ export async function auctionDataExists(id: number) {
  * @param nftTokenId
  * @returns
  */
-export async function loadNftData(nftToken: string, nftTokenId: number) {
+export async function loadNftData(
+  nftToken: string,
+  nftTokenId: number,
+  logger?: Logger
+) {
   let which: string;
   switch (nftToken) {
     case HAMMER_NFT:
@@ -481,6 +538,7 @@ export async function loadNftData(nftToken: string, nftTokenId: number) {
       // console.log('loadNftData: ' + JSON.stringify(nftData));
       return nftData;
     } catch (err: any) {
+      retries--;
       reportError(
         err,
         'loadNftData',
@@ -489,7 +547,8 @@ export async function loadNftData(nftToken: string, nftTokenId: number) {
           ', ' +
           retries +
           ' retries left, response received from server: ' +
-          text
+          text,
+        logger
       );
     }
   }
@@ -500,8 +559,8 @@ export async function loadNftData(nftToken: string, nftTokenId: number) {
  * refresh user's bids in db from the blockchain
  * @param address
  */
-export async function refreshUserBids(address: string) {
-  const userBids: UserBids = await bscGetUserBids(address);
+export async function refreshUserBids(address: string, logger?: Logger) {
+  const userBids: UserBids = await bscGetUserBids(address, logger);
   await saveUserBids(userBids);
 }
 
@@ -509,11 +568,11 @@ export async function refreshUserBids(address: string) {
  * refresh an auction in the db from the blockchain
  * @param id
  */
-export async function refreshAuction(id: number) {
+export async function refreshAuction(id: number, logger?: Logger) {
   let nftToken, nftTokenId;
   // see if it already exists in the database
   let existingData: AuctionData = await getAuctionData(id);
-  const auctionData: AuctionData = await bscGetCompleteAuctionData(id);
+  const auctionData: AuctionData = await bscGetCompleteAuctionData(id, logger);
   if (!existingData) {
     // it doesn't exist, create from scratch
     nftToken = auctionData.nftToken;
@@ -590,12 +649,23 @@ export async function getAuctionsForNft(nftToken: string, nftTokenId: number) {
  */
 export async function refreshLastSaleDataForNft(
   nftToken: string,
-  nftTokenId: number
+  nftTokenId: number,
+  logger?: Logger
 ) {
   const auctions = await getAuctionsForNft(nftToken, nftTokenId);
 
-  const lastPrice = await bscGetLastPrice(nftToken, nftTokenId.toString());
-  const lastToken = await bscGetLastToken(nftToken, nftTokenId.toString());
+  const lastPrice = await bscGetLastPrice(
+    nftToken,
+    nftTokenId.toString(),
+    undefined,
+    logger
+  );
+  const lastToken = await bscGetLastToken(
+    nftToken,
+    nftTokenId.toString(),
+    undefined,
+    logger
+  );
 
   for (const auction of auctions) {
     let changed = false;
@@ -690,7 +760,8 @@ export function bscParseAuction(auctionId: number, auction: any): AuctionData {
 export function reportError(
   err: any,
   baseMsg?: string,
-  postMsg?: string
+  postMsg?: string,
+  logger?: Logger
 ): string {
   let output = baseMsg ? baseMsg : '';
   output += ': error encountered';
@@ -703,31 +774,56 @@ export function reportError(
   if (postMsg) {
     output += '\n' + postMsg;
   }
-  console.error(output);
+  if (logger) {
+    logger.error(output);
+  } else {
+    console.error(output);
+  }
   return output;
 }
 
+/**
+ * make a contract call with automatic retries built in
+ * @param fnName
+ * @param args
+ * @param contract
+ * @param resultValidator will be passed the raw data returned from the contract. should throw an error if the data is invalid
+ * @param retries
+ * @returns
+ */
 export async function contractCall(
   fnName: string,
   args?: any[],
   contract?: Contract,
-  retries: number = 2
+  logger?: Logger,
+  retries: number = 2,
+  resultValidator?: (result) => void
 ) {
+  const info = (msg: string) => {
+    if (logger) logger.info(msg);
+    else console.info(msg);
+  };
+
+  let lastErr: any;
   while (retries >= 0) {
     try {
-      console.info(
+      info(
         `contractCall:${fnName}: args=${JSON.stringify(
           args
         )}, retries=${retries}`
       );
       if (!contract) contract = getMarketplaceContract();
       let result = await (contract[fnName] as Function).apply(contract, args);
+      if (resultValidator) resultValidator(result);
       return result;
     } catch (err: any) {
+      lastErr = err;
+
       reportError(
         err,
         'contractCall:' + fnName,
-        `args=${JSON.stringify(args)}, retries=${retries}`
+        `args=${JSON.stringify(args)}, retries=${retries}`,
+        logger
       );
       retries--;
       if (retries >= 0) {
@@ -737,6 +833,11 @@ export async function contractCall(
     }
   }
   throw new Error(
-    'contractCall:' + fnName + ', failed. args: ' + JSON.stringify(args)
+    'contractCall:' +
+      fnName +
+      ', failed. args: ' +
+      JSON.stringify(args) +
+      ', lastErr: ' +
+      JSON.stringify(lastErr)
   );
 }

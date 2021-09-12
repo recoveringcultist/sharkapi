@@ -75,9 +75,9 @@ export const temp = async (req, res, next) => {
 
       if (data.highestBid == null) {
         const highestBid = await utils.bscGetHighestBid(
-          contract,
           parseInt(doc.id),
-          data
+          data,
+          contract
         );
         data.highestBid = highestBid;
         await doc.ref.set(data);

@@ -23,8 +23,9 @@
   },
   "dependencies": {
     "@google-cloud/logging": "^9.5.5",
-    "@google-cloud/logging-bunyan": "^3.1.0",
+    "@google-cloud/logging-bunyan": "^3.1.1",
     "@types/cors": "^2.8.12",
+    "bunyan": "^1.8.15",
     "cors": "^2.8.5",
     "date-fns": "^2.23.0",
     "ethers": "^5.4.6",

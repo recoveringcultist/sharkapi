@@ -14,16 +14,18 @@
   },
   "scripts": {
     "start": "node dist/gcloud-crawler/src/app.js",
-    "build": "tsc && cp -r cert dist/gcloud-crawler",
+    "build": "rm -rf dist/* && tsc && cp -r cert dist/gcloud-crawler",
     "test": "mocha --exit test/*.test.js",
     "serve": "npm run build && npm start",
     "logs": "gcloud app logs tail -s crawler",
-    "deploy": "npm run build && gcloud app deploy & gcloud app browse -s crawler"
+    "deploy": "npm run build && gcloud app deploy & gcloud app browse -s crawler",
+    "localcreds": "gcloud auth application-default login"
   },
   "dependencies": {
     "@google-cloud/logging": "^9.5.5",
     "@google-cloud/logging-bunyan": "^3.1.0",
     "@types/cors": "^2.8.12",
+    "bunyan": "^1.8.15",
     "cors": "^2.8.5",
     "date-fns": "^2.23.0",
     "ethers": "^5.4.6",

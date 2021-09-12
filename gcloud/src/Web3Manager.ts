@@ -7,6 +7,7 @@ import * as utils from './common/utils';
 import Web3 from 'web3';
 import { Contract } from 'web3-eth-contract';
 import * as admin from 'firebase-admin';
+import { Logger } from '@google-cloud/logging-bunyan/build/src/middleware/express';
 
 export default class Web3Manager {
   private static readonly NAME: string = 'Web3Manager';
@@ -91,7 +92,12 @@ export default class Web3Manager {
   //   console.log(auction);
   // }
 
-  async contractCall(fnName: string, args?: any[], retries: number = 2) {
+  async contractCall(
+    fnName: string,
+    args?: any[],
+    retries: number = 2,
+    logger?: Logger
+  ) {
     while (retries >= 0) {
       try {
         console.info(
@@ -108,7 +114,8 @@ export default class Web3Manager {
         utils.reportError(
           err,
           'contractCall:' + fnName,
-          `args=${JSON.stringify(args)}, retries=${retries}`
+          `args=${JSON.stringify(args)}, retries=${retries}`,
+          logger
         );
         retries--;
         if (retries >= 0) {

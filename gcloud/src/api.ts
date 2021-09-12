@@ -1,3 +1,4 @@
+import { Logger } from '@google-cloud/logging-bunyan/build/src/middleware/express';
 import { differenceInSeconds } from 'date-fns';
 import * as admin from 'firebase-admin';
 import { AuctionData, AUCTION_FIELD_TYPES } from './common/AuctionData';
@@ -31,13 +32,9 @@ export const createApiRoutes = (app) => {
 };
 
 const api = async (req, res, next) => {
+  const logger: Logger = (req as any).log;
   try {
     const firestore = admin.firestore();
-
-    console.log('headers:');
-    console.log(req.headers);
-
-    // console.info(req.query);
 
     const nftWhereFields = ['series', 'rarity', 'tier'];
     const equalityWhereFields = [
@@ -77,7 +74,6 @@ const api = async (req, res, next) => {
 
     // reject invalid params
     for (const param of Object.keys(req.query)) {
-      // console.info(param);
       if (!allValidParams.includes(param)) {
         return next(
           new Error(
@@ -201,14 +197,12 @@ const api = async (req, res, next) => {
 
     // where clauses
     if (Object.keys(whereClauses).length > 0) {
-      // console.info(whereClauses);
       for (const key in whereClauses) {
         const val = whereClauses[key].val;
         const op = whereClauses[key].op;
         const whereField = nftWhereFields.includes(key)
           ? 'nftData.' + key
           : key;
-        // console.info(whereField, op, val);
         query = query.where(whereField, op, val);
       }
     }
@@ -245,6 +239,7 @@ const api = async (req, res, next) => {
 };
 
 const auctionDetail = async (req, res, next) => {
+  const logger: Logger = (req as any).log;
   const firestore = admin.firestore();
 
   const id = parseInt(req.params.id);
@@ -255,13 +250,14 @@ const auctionDetail = async (req, res, next) => {
 };
 
 const auctionRefresh = async (req, res, next) => {
+  const logger: Logger = (req as any).log;
   const firestore = admin.firestore();
 
   const id = parseInt(req.params.id);
   if (req.params.id == null || isNaN(id)) return next(new Error('no id'));
 
   try {
-    await utils.refreshAuction(id);
+    await utils.refreshAuction(id, logger);
 
     res.send('success');
   } catch (err) {
@@ -277,13 +273,16 @@ const auctionRefresh = async (req, res, next) => {
  * @returns
  */
 const auctionRaw = async (req, res, next) => {
+  const logger: Logger = (req as any).log;
+
   try {
     const id = parseInt(req.params.id);
     if (req.params.id == null || isNaN(id)) return next(new Error('no id'));
 
     const auctionData: AuctionData = await utils.bscGetCompleteAuctionData(
       id,
-      false
+      false,
+      logger
     );
 
     res.json(auctionData);
@@ -299,8 +298,9 @@ const auctionRaw = async (req, res, next) => {
  * @param next
  */
 const bscAuctionsLength = async (req, res, next) => {
+  const logger: Logger = (req as any).log;
   try {
-    const result = await utils.bscAuctionsLength();
+    const result = await utils.bscAuctionsLength(undefined, logger);
     return res.json(result);
   } catch (err) {
     return next(err);
@@ -315,11 +315,12 @@ const bscAuctionsLength = async (req, res, next) => {
  * @returns
  */
 const bscAuction = async (req, res, next) => {
+  const logger: Logger = (req as any).log;
   try {
     const id = parseInt(req.params.id);
     if (req.params.id == null || isNaN(id)) return next(new Error('no id'));
 
-    const result = await utils.bscGetAuction(id);
+    const result = await utils.bscGetAuction(id, undefined, logger);
     return res.json(result);
   } catch (err) {
     return next(err);
@@ -327,12 +328,17 @@ const bscAuction = async (req, res, next) => {
 };
 
 const bscHighestBid = async (req, res, next) => {
+  const logger: Logger = (req as any).log;
   try {
     const id = parseInt(req.params.id);
     if (req.params.id == null || isNaN(id)) return next(new Error('no id'));
 
-    const contract = utils.getMarketplaceContract();
-    const result = await utils.bscGetHighestBid(contract, id);
+    const result = await utils.bscGetHighestBid(
+      id,
+      undefined,
+      undefined,
+      logger
+    );
     return res.json(result);
   } catch (err) {
     return next(err);
@@ -347,15 +353,19 @@ const bscHighestBid = async (req, res, next) => {
  * @returns
  */
 const bscBidBalance = async (req, res, next) => {
+  const logger: Logger = (req as any).log;
   try {
-    const contract = utils.getMarketplaceContract();
-
     const id = parseInt(req.params.id);
     if (req.params.id == null || isNaN(id)) throw new Error('no id');
     const address: string = req.params.address;
     if (address == null) throw new Error('no address');
 
-    const balance = await utils.bscGetBidBalance(id, address, contract);
+    const balance = await utils.bscGetBidBalance(
+      id,
+      address,
+      undefined,
+      logger
+    );
     res.json(balance);
   } catch (err) {
     return next(err);
@@ -370,6 +380,7 @@ const bscBidBalance = async (req, res, next) => {
  * @returns
  */
 const userBids = async (req, res, next) => {
+  const logger: Logger = (req as any).log;
   try {
     const address: string = req.params.address;
     if (address == null) throw new Error('no address');
@@ -408,13 +419,13 @@ const userBidsInfo = async (req, res, next) => {
  * @returns
  */
 const userBidsRefresh = async (req, res, next) => {
-  const firestore = admin.firestore();
+  const logger: Logger = (req as any).log;
 
   const address: string = req.params.address;
   if (address == null) throw new Error('no address');
 
   try {
-    await utils.refreshUserBids(address);
+    await utils.refreshUserBids(address, logger);
 
     res.send('success');
   } catch (err) {
@@ -452,13 +463,15 @@ const auctionsForNft = async (req, res, next) => {
  * @returns
  */
 const nftSalesDataRefresh = async (req, res, next) => {
+  const logger: Logger = (req as any).log;
+
   const id = parseInt(req.params.id);
   if (req.params.id == null || isNaN(id)) throw new Error('no id');
   const address: string = req.params.address;
   if (address == null) throw new Error('no address');
 
   try {
-    await utils.refreshLastSaleDataForNft(address, id);
+    await utils.refreshLastSaleDataForNft(address, id, logger);
 
     res.send('success');
   } catch (err) {
@@ -493,9 +506,14 @@ const bidBalanceUser = async (req, res, next) => {
  * @returns
  */
 const bscBidBalanceForUser = async (req, res, next) => {
+  const logger: Logger = (req as any).log;
   function log(msg) {
     res.write(msg + '\n');
-    console.info(msg);
+    if (logger) {
+      logger.info(msg);
+    } else {
+      console.info(msg);
+    }
   }
 
   try {
@@ -527,11 +545,12 @@ const bscBidBalanceForUser = async (req, res, next) => {
 };
 
 const bscGetUserBidsLength = async (req, res, next) => {
+  const logger: Logger = (req as any).log;
   try {
     const address: string = req.params.address;
     if (address == null) throw new Error('no address');
 
-    const result = await utils.bscGetUserBidsLength(address);
+    const result = await utils.bscGetUserBidsLength(address, undefined, logger);
     res.json(result);
   } catch (err) {
     return next(err);
@@ -539,11 +558,12 @@ const bscGetUserBidsLength = async (req, res, next) => {
 };
 
 const bscGetUserBids = async (req, res, next) => {
+  const logger: Logger = (req as any).log;
   try {
     const address: string = req.params.address;
     if (address == null) throw new Error('no address');
 
-    const result = await utils.bscGetUserBids(address);
+    const result = await utils.bscGetUserBids(address, undefined, logger);
     res.json(result);
   } catch (err) {
     return next(err);
@@ -555,20 +575,25 @@ const bscGetUserBids = async (req, res, next) => {
  * @param start
  * @param end
  */
-const refreshBatch = async (start: number, end: number) => {
-  console.info(`refreshBatch: refreshing from ${start} to ${end}:`);
+const refreshBatch = async (start: number, end: number, logger: Logger) => {
+  logger.info(`refreshBatch: refreshing from ${start} to ${end}:`);
 
   let refreshOn = false;
   let failedRefreshes: number[] = [];
   for (let i = start; i < end; i++) {
     try {
-      console.info(`refreshBatch: refreshing auction ${i}`);
-      await utils.refreshAuction(i);
+      logger.info(`refreshBatch: refreshing auction ${i}`);
+      await utils.refreshAuction(i, logger);
 
       // wait a bit
       await new Promise((resolve) => setTimeout(resolve, 1000));
     } catch (e: any) {
-      utils.reportError(e, 'refreshBatch', `queueing auction ${i} for retry`);
+      utils.reportError(
+        e,
+        'refreshBatch',
+        `queueing auction ${i} for retry`,
+        logger
+      );
 
       failedRefreshes.push(i);
     }
@@ -577,8 +602,8 @@ const refreshBatch = async (start: number, end: number) => {
   // try the ones again that failed
   for (const id of failedRefreshes) {
     try {
-      console.info(`refreshBatch: refreshing previously failed auction ${id}`);
-      await utils.refreshAuction(id);
+      logger.info(`refreshBatch: refreshing previously failed auction ${id}`);
+      await utils.refreshAuction(id, logger);
 
       // wait a bit
       await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -586,20 +611,27 @@ const refreshBatch = async (start: number, end: number) => {
       utils.reportError(
         e,
         'refreshBatch',
-        `auction ${id} failed for the second time, skipping`
+        `auction ${id} failed for the second time, skipping`,
+        logger
       );
     }
   }
 
-  console.info('refreshBatch: complete');
+  logger.info('refreshBatch: complete');
 };
 
 const refreshCron = async (req, res) => {
-  const firestore = admin.firestore();
+  const logger: Logger = (req as any).log;
   function log(msg) {
     res.write(msg + '\n');
-    console.info(msg);
+    if (logger) {
+      logger.info(msg);
+    } else {
+      console.info(msg);
+    }
   }
+
+  const firestore = admin.firestore();
 
   const cronStart: Date = new Date();
 
@@ -621,7 +653,7 @@ const refreshCron = async (req, res) => {
         `refreshCron: refresh job already running, started ${difference} sec ago.`
       );
       if (difference > 60 * 60 * 2) {
-        console.error(
+        logger.error(
           `cronBatch: last start time was over two hours (${difference}s) ago! consider a forced reset`
         );
       }
@@ -664,7 +696,7 @@ const refreshCron = async (req, res) => {
 
   try {
     log(`refreshCron: refreshing batch ${startId} to ${endId}`);
-    await refreshBatch(startId, endId);
+    await refreshBatch(startId, endId, logger);
     log(`refreshCron: batch finished, next start=${endId}`);
 
     // save where to start next time
@@ -686,6 +718,8 @@ const refreshCron = async (req, res) => {
 };
 
 const refreshAll = async (req, res) => {
+  const logger: Logger = (req as any).log;
+
   function log(msg) {
     res.write(msg + '\n');
     console.info(msg);
@@ -716,7 +750,7 @@ const refreshAll = async (req, res) => {
     if (refreshOn) {
       try {
         log(`refreshAll: refreshing auction ${i}`);
-        await utils.refreshAuction(i);
+        await utils.refreshAuction(i, logger);
 
         // wait a bit
         await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -733,7 +767,7 @@ const refreshAll = async (req, res) => {
   for (const id of failedRefreshes) {
     try {
       log(`refreshAll: refreshing previously failed auction ${id}`);
-      await utils.refreshAuction(id);
+      await utils.refreshAuction(id, logger);
 
       // wait a bit
       await new Promise((resolve) => setTimeout(resolve, 1000));

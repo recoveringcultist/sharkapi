@@ -4,7 +4,7 @@ import { NULL_ADDRESS } from '../../gcloud/src/common/constants';
 import * as utils from '../../gcloud/src/common/utils';
 
 // other imports
-import Web3Manager from './Web3Manager';
+import Web3Crawler from './Web3Crawler';
 
 /**
  * query blockchain events continually over time and sync them to firebase db
@@ -14,7 +14,7 @@ export const setupCrawler = () => {
 
   console.log('registering for blockchain events');
 
-  const manager: Web3Manager = new Web3Manager();
+  const manager: Web3Crawler = new Web3Crawler();
 
   const noWrites: boolean = true;
 
