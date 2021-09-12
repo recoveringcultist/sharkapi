@@ -4,31 +4,36 @@ import * as admin from 'firebase-admin';
 import { AuctionData, AUCTION_FIELD_TYPES } from './common/AuctionData';
 import { COLLNAME_AUCTION } from './common/constants';
 import * as utils from './common/utils';
+import { runCron } from './cron';
 import { maintenance2 } from './maintenance';
 
-export const createApiRoutes = (app) => {
-  app.get('/api/auctionraw/:id', auctionRaw);
-  app.get('/api/auctionrefresh/:id', auctionRefresh);
-  app.get('/api/auction/:id', auctionDetail);
-  app.get('/api/auction', api);
-  app.get('/api/bidbalanceuser/:address', bidBalanceUser);
-  app.get('/api/userbids/:address', userBids);
-  app.get('/api/userbidsinfo/:address', userBidsInfo);
-  app.get('/api/userbidsrefresh/:address', userBidsRefresh);
-  app.get('/api/auctionsfornft/:id/:address', auctionsForNft);
-  app.get('/api/nftsalesdatarefresh/:id/:address', nftSalesDataRefresh);
-  app.get('/api/refreshcron', refreshCron);
-  app.get('/api/bsc/auctionslength', bscAuctionsLength);
-  app.get('/api/bsc/auction/:id', bscAuction);
-  app.get('/api/bsc/bidbalance/:id/:address', bscBidBalance);
-  app.get('/api/bsc/bidbalanceuser/:address', bscBidBalanceForUser);
-  app.get('/api/bsc/highestbid/:id', bscHighestBid);
-  app.get('/api/bsc/getuserbidslength/:address', bscGetUserBidsLength);
-  app.get('/api/bsc/getuserbids/:address', bscGetUserBids);
-  app.get('/api/maintenance2', maintenance2);
+export const createApiRoutes = (app, log) => {
+  app.get('/api/auctionraw/:id', log, auctionRaw);
+  app.get('/api/auctionrefresh/:id', log, auctionRefresh);
+  app.get('/api/auction/:id', log, auctionDetail);
+  app.get('/api/auction', log, api);
+  app.get('/api/bidbalanceuser/:address', log, bidBalanceUser);
+  app.get('/api/userbids/:address', log, userBids);
+  app.get('/api/userbidsinfo/:address', log, userBidsInfo);
+  app.get('/api/userbidsrefresh/:address', log, userBidsRefresh);
+  app.get('/api/auctionsfornft/:id/:address', log, auctionsForNft);
+  app.get('/api/nftsalesdatarefresh/:id/:address', log, nftSalesDataRefresh);
+  // app.get('/api/refreshcron', refreshCron);
+  app.get('/api/bsc/auctionslength', log, bscAuctionsLength);
+  app.get('/api/bsc/auction/:id', log, bscAuction);
+  app.get('/api/bsc/bidbalance/:id/:address', log, bscBidBalance);
+  app.get('/api/bsc/bidbalanceuser/:address', log, bscBidBalanceForUser);
+  app.get('/api/bsc/highestbid/:id', log, bscHighestBid);
+  app.get('/api/bsc/getuserbidslength/:address', log, bscGetUserBidsLength);
+  app.get('/api/bsc/getuserbids/:address', log, bscGetUserBids);
+  app.get('/api/maintenance2', log, maintenance2);
   // app.get('/api/maintenance1', maintenance1);
   // app.get('/api/tmp', temp);
   // app.get('/api/refreshall', refreshAll);
+};
+
+export const createCronRoutes = (app, log) => {
+  app.get('/api/refreshcron', log, runCron);
 };
 
 const api = async (req, res, next) => {
@@ -570,152 +575,150 @@ const bscGetUserBids = async (req, res, next) => {
   }
 };
 
-/**
- * refresh a batch of auctions
- * @param start
- * @param end
- */
-const refreshBatch = async (start: number, end: number, logger: Logger) => {
-  logger.info(`refreshBatch: refreshing from ${start} to ${end}:`);
+// const refreshBatch = async (start: number, end: number, logger: Logger) => {
+//   logger.info(`refreshBatch: refreshing from ${start} to ${end}:`);
 
-  let refreshOn = false;
-  let failedRefreshes: number[] = [];
-  for (let i = start; i < end; i++) {
-    try {
-      logger.info(`refreshBatch: refreshing auction ${i}`);
-      await utils.refreshAuction(i, logger);
+//   let refreshOn = false;
+//   let failedRefreshes: number[] = [];
+//   for (let i = start; i < end; i++) {
+//     try {
+//       logger.info(`refreshBatch: refreshing auction ${i}`);
+//       await utils.refreshAuction(i, logger);
 
-      // wait a bit
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-    } catch (e: any) {
-      utils.reportError(
-        e,
-        'refreshBatch',
-        `queueing auction ${i} for retry`,
-        logger
-      );
+//       // wait a bit
+//       await new Promise((resolve) => setTimeout(resolve, 1000));
+//     } catch (e: any) {
+//       utils.reportError(
+//         e,
+//         'refreshBatch',
+//         `queueing auction ${i} for retry`,
+//         logger
+//       );
 
-      failedRefreshes.push(i);
-    }
-  }
+//       failedRefreshes.push(i);
+//     }
+//   }
 
-  // try the ones again that failed
-  for (const id of failedRefreshes) {
-    try {
-      logger.info(`refreshBatch: refreshing previously failed auction ${id}`);
-      await utils.refreshAuction(id, logger);
+//   // try the ones again that failed
+//   for (const id of failedRefreshes) {
+//     try {
+//       logger.info(`refreshBatch: refreshing previously failed auction ${id}`);
+//       await utils.refreshAuction(id, logger);
 
-      // wait a bit
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-    } catch (e: any) {
-      utils.reportError(
-        e,
-        'refreshBatch',
-        `auction ${id} failed for the second time, skipping`,
-        logger
-      );
-    }
-  }
+//       // wait a bit
+//       await new Promise((resolve) => setTimeout(resolve, 1000));
+//     } catch (e: any) {
+//       utils.reportError(
+//         e,
+//         'refreshBatch',
+//         `auction ${id} failed for the second time, skipping`,
+//         logger
+//       );
+//     }
+//   }
 
-  logger.info('refreshBatch: complete');
-};
+//   logger.info('refreshBatch: complete');
+// };
 
-const refreshCron = async (req, res) => {
-  const logger: Logger = (req as any).log;
-  function log(msg) {
-    res.write(msg + '\n');
-    if (logger) {
-      logger.info(msg);
-    } else {
-      console.info(msg);
-    }
-  }
+// const refreshCron = async (req, res) => {
+//   const logger: Logger = (req as any).log;
+//   function log(msg) {
+//     res.write(msg + '\n');
+//     if (logger) {
+//       logger.info(msg);
+//     } else {
+//       console.info(msg);
+//     }
+//   }
 
-  const firestore = admin.firestore();
+//   const firestore = admin.firestore();
+//   const cronStart: Date = new Date();
 
-  const cronStart: Date = new Date();
+//   res.status(200);
 
-  res.status(200);
+//   // make sure a refresh is not currently running
+//   const db = admin.database();
+//   const data = await db.ref('/cronIsRunning').once('value');
+//   const isRunning: boolean = data.val();
 
-  // make sure a refresh is not currently running
-  const running = await firestore.doc('cron/running').get();
-  if (running.exists && (running.data() as any).running == true) {
-    let runningData: {
-      startTime: admin.firestore.Timestamp;
-      running: boolean;
-    } = running.data() as any;
-    if (runningData.running) {
-      let startTime = runningData.startTime.toDate();
-      let now = new Date();
-      let difference = differenceInSeconds(now, startTime);
+//   const running = await firestore.doc('cron/running').get();
+//   if (running.exists && (running.data() as any).running == true) {
+//     let runningData: {
+//       startTime: admin.firestore.Timestamp;
+//       running: boolean;
+//     } = running.data() as any;
+//     if (runningData.running) {
+//       let startTime = runningData.startTime.toDate();
+//       let now = new Date();
+//       let difference = differenceInSeconds(now, startTime);
 
-      log(
-        `refreshCron: refresh job already running, started ${difference} sec ago.`
-      );
-      if (difference > 60 * 60 * 2) {
-        logger.error(
-          `cronBatch: last start time was over two hours (${difference}s) ago! consider a forced reset`
-        );
-      }
-      return res.end();
-    }
-  }
+//       log(
+//         `refreshCron: refresh job already running, started ${difference} sec ago.`
+//       );
+//       if (difference > 60 * 60 * 2) {
+//         logger.error(
+//           `cronBatch: last start time was over two hours (${difference}s) ago! consider a forced reset`
+//         );
+//       }
+//       return res.end();
+//     }
+//   }
 
-  log('refreshCron: refreshing from blockchain:');
+//   log('refreshCron: refreshing from blockchain:');
 
-  await firestore.doc('cron/running').set({
-    running: true,
-    startTime: admin.firestore.FieldValue.serverTimestamp(),
-  });
+//   await firestore.doc('cron/running').set({
+//     running: true,
+//     startTime: admin.firestore.FieldValue.serverTimestamp(),
+//   });
 
-  // see where we left off
-  const cronSnap = await firestore.doc('cron/last').get();
-  let startId: number = 0;
-  if (!cronSnap.exists) {
-    // first time running cron
-  } else {
-    const cronData: any = cronSnap.data();
-    startId = cronData.startId;
-  }
+//   // see where we left off
+//   const cronSnap = await firestore.doc('cron/last').get();
+//   let startId: number = 0;
+//   if (!cronSnap.exists) {
+//     // first time running cron
+//   } else {
+//     const cronData: any = cronSnap.data();
+//     startId = cronData.startId;
+//   }
 
-  // grab total number of auctions
-  let numAuctions = await utils.bscAuctionsLength();
-  log(`refreshCron: number of auctions: ${numAuctions}`);
+//   // grab total number of auctions
+//   let numAuctions = await utils.bscAuctionsLength();
+//   log(`refreshCron: number of auctions: ${numAuctions}`);
 
-  // set up the next batch
-  const batchSize: number = 10;
+//   // set up the next batch
+//   const batchSize: number = 10;
 
-  // did we go to the end last time? wrap around
-  if (startId >= numAuctions) {
-    startId = 0;
-  }
+//   // did we go to the end last time? wrap around
+//   if (startId >= numAuctions) {
+//     startId = 0;
+//   }
 
-  // don't go past the end of auctions
-  let endId: number = startId + batchSize;
-  if (endId >= numAuctions) endId = numAuctions;
+//   // don't go past the end of auctions
+//   let endId: number = startId + batchSize;
+//   if (endId >= numAuctions) endId = numAuctions;
 
-  try {
-    log(`refreshCron: refreshing batch ${startId} to ${endId}`);
-    await refreshBatch(startId, endId, logger);
-    log(`refreshCron: batch finished, next start=${endId}`);
+//   try {
+//     log(`refreshCron: refreshing batch ${startId} to ${endId}`);
+//     await refreshBatch(startId, endId, logger);
+//     log(`refreshCron: batch finished, next start=${endId}`);
 
-    // save where to start next time
-    await firestore.doc('cron/last').set({
-      startId: endId,
-    });
-  } catch (e: any) {
-    log(`refreshCron: error refreshing batch ${startId} to ${endId}`);
-    log(e.message + '\n' + e.stack);
-  }
+//     // save where to start next time
+//     await firestore.doc('cron/last').set({
+//       startId: endId,
+//     });
+//   } catch (e: any) {
+//     log(`refreshCron: error refreshing batch ${startId} to ${endId}`);
+//     log(e.message + '\n' + e.stack);
+//   }
 
-  await firestore.doc('cron/running').update({ running: false });
+//   await firestore.doc('cron/running').update({ running: false });
 
-  const cronEnd: Date = new Date();
-  let runtime = differenceInSeconds(cronEnd, cronStart);
-  log('refreshCron: job took ' + runtime + ' seconds');
+//   const cronEnd: Date = new Date();
+//   let runtime = differenceInSeconds(cronEnd, cronStart);
+//   log('refreshCron: job took ' + runtime + ' seconds');
 
-  res.end();
-};
+//   res.end();
+// };
 
 const refreshAll = async (req, res) => {
   const logger: Logger = (req as any).log;

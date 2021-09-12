@@ -14,7 +14,7 @@
   },
   "scripts": {
     "start": "node dist/app.js",
-    "build": "tsc",
+    "build": "rm -rf dist/* && tsc",
     "test": "mocha --exit test/*.test.js",
     "serve": "npm run build && npm start",
     "logs": "gcloud app logs tail -s default",

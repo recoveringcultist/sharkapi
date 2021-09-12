@@ -513,6 +513,11 @@ export async function loadNftData(
   nftTokenId: number,
   logger?: Logger
 ) {
+  const log = (msg) => {
+    if (logger) logger.info(msg);
+    else console.info(msg);
+  };
+
   let which: string;
   switch (nftToken) {
     case HAMMER_NFT:
@@ -527,6 +532,7 @@ export async function loadNftData(
 
   const url = `https://api.autoshark.finance/api/nft/${which}?tokenId=${nftTokenId}`;
   let retries = 2;
+  let errorOccurred = false;
   while (retries >= 0) {
     let response, text;
 
@@ -535,10 +541,14 @@ export async function loadNftData(
       text = await response.text();
       const json: any = JSON.parse(text);
       const nftData: NftData = json[0];
-      // console.log('loadNftData: ' + JSON.stringify(nftData));
+      if (errorOccurred) {
+        // we successfully retried and it worked!
+        log(`loadNftData worked after retrying, url=${url}`);
+      }
       return nftData;
     } catch (err: any) {
       retries--;
+      errorOccurred = true;
       reportError(
         err,
         'loadNftData',
@@ -572,7 +582,11 @@ export async function refreshAuction(id: number, logger?: Logger) {
   let nftToken, nftTokenId;
   // see if it already exists in the database
   let existingData: AuctionData = await getAuctionData(id);
-  const auctionData: AuctionData = await bscGetCompleteAuctionData(id, logger);
+  const auctionData: AuctionData = await bscGetCompleteAuctionData(
+    id,
+    false,
+    logger
+  );
   if (!existingData) {
     // it doesn't exist, create from scratch
     nftToken = auctionData.nftToken;

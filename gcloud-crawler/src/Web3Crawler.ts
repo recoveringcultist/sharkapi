@@ -330,6 +330,7 @@ export default class Web3Crawler {
       // create data from scratch
       const auctionData: AuctionData = await utils.bscGetCompleteAuctionData(
         auctionId,
+        true,
         this._logger
       );
 

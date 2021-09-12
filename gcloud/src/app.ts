@@ -2,7 +2,7 @@
 
 import express from 'express';
 import cors from 'cors';
-import { createApiRoutes } from './api';
+import { createApiRoutes, createCronRoutes } from './api';
 
 import * as admin from 'firebase-admin';
 import Web3Manager from './Web3Manager';
@@ -17,8 +17,14 @@ async function startServer() {
   });
   const firestore = admin.firestore();
 
-  const { logger, mw } = await lb.express.middleware({
+  const { logger, mw: defaultLog } = await lb.express.middleware({
     logName: 'default',
+    serviceContext: {
+      service: 'default',
+    },
+  });
+  const { mw: cronLog } = await lb.express.middleware({
+    logName: 'cron',
     serviceContext: {
       service: 'default',
     },
@@ -28,18 +34,20 @@ async function startServer() {
   // Install the logging middleware. This ensures that a Bunyan-style `log`
   // function is available on the `request` object. This should be the very
   // first middleware you attach to your app.
-  app.use(mw);
+  // app.use(defaultLog);
 
   app.use(cors());
 
-  app.get('/_ah/warmup', (req, res) => {
+  app.get('/_ah/warmup', defaultLog, (req, res) => {
     // Handle your warmup logic. Initiate db connection, etc.
+    res.send('success');
   });
 
-  app.get('/', (req, res) => {
+  app.get('/', defaultLog, (req, res) => {
     res.status(200).send('sharkapi').end();
   });
-  createApiRoutes(app);
+  createCronRoutes(app, cronLog);
+  createApiRoutes(app, defaultLog);
 
   // error handler
   app.use((err, req, res, next) => {
