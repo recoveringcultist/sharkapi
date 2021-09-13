@@ -8,6 +8,9 @@ import * as utils from './common/utils';
 export const DB_CRON_IS_RUNNING: string = '/cronIsRunning';
 export const DB_CRON_LAST_START: string = '/cronLastStart';
 export const DB_CRON_NEXT_AUCTION_ID: string = '/cronNextAuctionId';
+export const DB_CRON_SCANSTART: string = '/cronScanStart';
+export const DB_CRON_TOTAL_REFRESHES: string = '/cronTotalRefreshes';
+export const DB_CRON_TOTAL_PROCESSED: string = '/cronTotalProcessed';
 
 export const cronIsRunning = async () => {
   const db = admin.database();
@@ -30,6 +33,11 @@ export const getCronLastStart = async () => {
   return data.val();
 };
 
+export const saveCronScanStart = async () => {
+  const db = admin.database();
+  await db.ref(DB_CRON_SCANSTART).push(admin.database.ServerValue.TIMESTAMP);
+};
+
 export const updateCronLastStart = async () => {
   const db = admin.database();
   await db.ref(DB_CRON_LAST_START).set(admin.database.ServerValue.TIMESTAMP);
@@ -44,6 +52,22 @@ export const getCronNextAuctionId = async () => {
 export const setCronNextAuctionId = async (value: number) => {
   const db = admin.database();
   await db.ref(DB_CRON_NEXT_AUCTION_ID).set(value);
+};
+
+export const addCronRefreshes = async (value: number) => {
+  const db = admin.database();
+  const data = await db.ref(DB_CRON_TOTAL_REFRESHES).once('value');
+  let numRefreshes = data.val();
+  numRefreshes += value;
+  await db.ref(DB_CRON_TOTAL_REFRESHES).set(numRefreshes);
+};
+
+export const addCronProcessed = async (value: number) => {
+  const db = admin.database();
+  const data = await db.ref(DB_CRON_TOTAL_REFRESHES).once('value');
+  let numRefreshes = data.val();
+  numRefreshes += value;
+  await db.ref(DB_CRON_TOTAL_REFRESHES).set(numRefreshes);
 };
 
 export const runCron = async (req, res, next) => {
@@ -88,7 +112,10 @@ export const runCron = async (req, res, next) => {
 
   // grab total number of auctions
   let totalAuctions = await utils.bscAuctionsLength(undefined, logger);
-  if (startId >= totalAuctions) startId = 0;
+  if (startId >= totalAuctions) {
+    startId = 0;
+    await saveCronScanStart();
+  }
   log(
     `runCron: starting processing at: ${startId}, total number of auctions: ${totalAuctions}`
   );
@@ -138,6 +165,7 @@ export const runCron = async (req, res, next) => {
       // wrap around to the beginning if we go off the end
       if (curAuctionId >= totalAuctions) {
         curAuctionId = 0;
+        await saveCronScanStart();
       }
 
       log(
@@ -156,6 +184,8 @@ export const runCron = async (req, res, next) => {
   }
 
   // no longer processing, save where to start next time
+  await addCronRefreshes(numRefreshes);
+  await addCronProcessed(numAuctionsProcessed);
   await setCronRunning(false);
   await setCronNextAuctionId(curAuctionId + 1);
 
