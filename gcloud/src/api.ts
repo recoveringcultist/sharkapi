@@ -5,7 +5,12 @@ import { AuctionData, AUCTION_FIELD_TYPES } from './common/AuctionData';
 import { COLLNAME_AUCTION } from './common/constants';
 import * as utils from './common/utils';
 import { runCron } from './cron';
-import { maintenance2 } from './maintenance';
+import {
+  maintenance2,
+  maintenance3,
+  maintenance4,
+  maintenance5,
+} from './maintenance';
 
 export const createApiRoutes = (app, log) => {
   app.get('/api/auctionraw/:id', log, auctionRaw);
@@ -18,7 +23,6 @@ export const createApiRoutes = (app, log) => {
   app.get('/api/userbidsrefresh/:address', log, userBidsRefresh);
   app.get('/api/auctionsfornft/:id/:address', log, auctionsForNft);
   app.get('/api/nftsalesdatarefresh/:id/:address', log, nftSalesDataRefresh);
-  // app.get('/api/refreshcron', refreshCron);
   app.get('/api/bsc/auctionslength', log, bscAuctionsLength);
   app.get('/api/bsc/auction/:id', log, bscAuction);
   app.get('/api/bsc/bidbalance/:id/:address', log, bscBidBalance);
@@ -26,7 +30,9 @@ export const createApiRoutes = (app, log) => {
   app.get('/api/bsc/highestbid/:id', log, bscHighestBid);
   app.get('/api/bsc/getuserbidslength/:address', log, bscGetUserBidsLength);
   app.get('/api/bsc/getuserbids/:address', log, bscGetUserBids);
-  app.get('/api/maintenance2', log, maintenance2);
+  // app.get('/api/maintenance3', log, maintenance3);
+  // app.get('/api/maintenance4', log, maintenance4);
+  // app.get('/api/maintenance5', log, maintenance5);
   // app.get('/api/maintenance1', maintenance1);
   // app.get('/api/tmp', temp);
   // app.get('/api/refreshall', refreshAll);
