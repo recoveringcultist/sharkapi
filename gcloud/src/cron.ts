@@ -11,6 +11,7 @@ export const DB_CRON_NEXT_AUCTION_ID: string = '/cronNextAuctionId';
 export const DB_CRON_SCANSTART: string = '/cronScanStart';
 export const DB_CRON_TOTAL_REFRESHES: string = '/cronTotalRefreshes';
 export const DB_CRON_TOTAL_PROCESSED: string = '/cronTotalProcessed';
+export const DB_CRON_DURATION: string = '/cronDuration';
 
 export const cronIsRunning = async () => {
   const db = admin.database();
@@ -36,6 +37,11 @@ export const getCronLastStart = async () => {
 export const saveCronScanStart = async () => {
   const db = admin.database();
   await db.ref(DB_CRON_SCANSTART).push(admin.database.ServerValue.TIMESTAMP);
+};
+
+export const saveCronDuration = async (value: number) => {
+  const db = admin.database();
+  await db.ref(DB_CRON_DURATION).push(value);
 };
 
 export const updateCronLastStart = async () => {
@@ -64,10 +70,10 @@ export const addCronRefreshes = async (value: number) => {
 
 export const addCronProcessed = async (value: number) => {
   const db = admin.database();
-  const data = await db.ref(DB_CRON_TOTAL_REFRESHES).once('value');
+  const data = await db.ref(DB_CRON_TOTAL_PROCESSED).once('value');
   let numRefreshes = data.val();
   numRefreshes += value;
-  await db.ref(DB_CRON_TOTAL_REFRESHES).set(numRefreshes);
+  await db.ref(DB_CRON_TOTAL_PROCESSED).set(numRefreshes);
 };
 
 export const runCron = async (req, res, next) => {
@@ -192,6 +198,7 @@ export const runCron = async (req, res, next) => {
   const cronEnd: Date = new Date();
   let runtime = differenceInSeconds(cronEnd, cronStart);
   log('runCron: job took ' + runtime + ' seconds');
+  await saveCronDuration(runtime);
 
   res.end();
 };
