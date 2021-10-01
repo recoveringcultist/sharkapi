@@ -101,10 +101,11 @@ export const runCron = async (req, res, next) => {
     log(`runCron: refresh job already running, started ${difference} sec ago.`);
     if (difference > 60 * 60 * 2) {
       logger.error(
-        `cronBatch: last start time was over two hours (${difference}s) ago! consider a forced reset`
+        `cronBatch: last start time was over two hours (${difference}s) ago! force-restarting now!`
       );
+    } else {
+      return res.end();
     }
-    return res.end();
   }
 
   log('runCron: refreshing from blockchain:');

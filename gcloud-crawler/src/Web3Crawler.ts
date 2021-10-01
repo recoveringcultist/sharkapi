@@ -367,6 +367,11 @@ export default class Web3Crawler {
           auctionId,
           highestBidder
         );
+
+        // update the auction's endTime, some bids extend it
+        const freshData = await utils.bscGetAuction(auctionId);
+        existingData.endTime = freshData.endTime;
+
         await utils.saveAuctionData(existingData);
       }
 
