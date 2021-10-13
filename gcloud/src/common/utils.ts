@@ -17,6 +17,7 @@ import {
   NULL_ADDRESS,
   RPC_URL,
   SHARK_NFT,
+  SHARK2_NFT,
 } from './constants';
 import { Logger } from '@google-cloud/logging-bunyan/build/src/middleware/express';
 
@@ -526,6 +527,8 @@ export async function loadNftData(
     case SHARK_NFT:
       which = '1';
       break;
+    case SHARK2_NFT:
+      which = '2';
     default:
       throw new Error('unknown nftToken ' + nftToken);
   }
