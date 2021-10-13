@@ -529,6 +529,7 @@ export async function loadNftData(
       break;
     case SHARK2_NFT:
       which = '2';
+      break;
     default:
       throw new Error('unknown nftToken ' + nftToken);
   }
