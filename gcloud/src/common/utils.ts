@@ -16,8 +16,9 @@ import {
   MARKETPLACE_CONTRACT,
   NULL_ADDRESS,
   RPC_URL,
-  SHARK_NFT,
-  SHARK2_NFT,
+  SSS1_NFT,
+  SSS2_NFT,
+  SSS2OG_NFT,
 } from './constants';
 import { Logger } from '@google-cloud/logging-bunyan/build/src/middleware/express';
 
@@ -524,11 +525,14 @@ export async function loadNftData(
     case HAMMER_NFT:
       which = 'hammer';
       break;
-    case SHARK_NFT:
+    case SSS1_NFT:
       which = '1';
       break;
-    case SHARK2_NFT:
+    case SSS2_NFT:
       which = '2';
+      break;
+    case SSS2OG_NFT:
+      which = '10000';
       break;
     default:
       throw new Error('unknown nftToken ' + nftToken);

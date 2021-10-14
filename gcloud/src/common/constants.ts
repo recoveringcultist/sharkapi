@@ -1,6 +1,7 @@
 export const HAMMER_NFT: string = '0xcA56AF4bde480B3c177E1A4115189F261C2af034';
-export const SHARK_NFT: string = '0x13e14f6EC8fee53b69eBd4Bd69e35FFCFe8960DE';
-export const SHARK2_NFT: string = '0xcd2B54FD07E9A71D261E1e3CE6c4ebb54810B12f';
+export const SSS1_NFT: string = '0x13e14f6EC8fee53b69eBd4Bd69e35FFCFe8960DE';
+export const SSS2_NFT: string = '0xcd2B54FD07E9A71D261E1e3CE6c4ebb54810B12f';
+export const SSS2OG_NFT: string = '0x2244db13245a6FeBfD43c2411cE6AfcAF3B6d9Ad';
 export const COLLNAME_AUCTION: string = 'auctiondata';
 export const COLLNAME_BIDBALANCE: string = 'bidbalance';
 export const COLLNAME_USERBIDS: string = 'userbids';
