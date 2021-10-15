@@ -23,6 +23,8 @@ export const createApiRoutes = (app, log) => {
   app.get('/api/userbidsrefresh/:address', log, userBidsRefresh);
   app.get('/api/auctionsfornft/:id/:address', log, auctionsForNft);
   app.get('/api/nftsalesdatarefresh/:id/:address', log, nftSalesDataRefresh);
+  app.get('/api/fixmissingauctions', log, fixMissingAuctions);
+
   app.get('/api/bsc/auctionslength', log, bscAuctionsLength);
   app.get('/api/bsc/auction/:id', log, bscAuction);
   app.get('/api/bsc/bidbalance/:id/:address', log, bscBidBalance);
@@ -725,6 +727,71 @@ const bscGetUserBids = async (req, res, next) => {
 
 //   res.end();
 // };
+
+/**
+ * look for missing auctions in database and fix them
+ * @param req
+ * @param res
+ */
+const fixMissingAuctions = async (req, res) => {
+  const logger: Logger = (req as any).log;
+
+  function log(msg) {
+    res.write('fixMissingAuctions: ' + msg + '\n');
+    console.info(msg);
+  }
+
+  res.status(200);
+  log('refreshing from blockchain:');
+
+  // grab total number of auctions
+  let numAuctions = await utils.bscAuctionsLength();
+  log(`total number of auctions on blockchain: ${numAuctions}`);
+  let numFixed = 0;
+
+  const firestore = admin.firestore();
+
+  let failedRefreshes: number[] = [];
+  for (let i = 0; i < numAuctions; i++) {
+    // check each auction in the db
+    // if we find one that's mising, refresh it
+    const snap = await firestore.doc(`${COLLNAME_AUCTION}/${i}`).get();
+    if (!snap.exists) {
+      try {
+        log(`refreshing auction ${i}`);
+        await utils.refreshAuction(i, logger);
+        numFixed++;
+      } catch (e: any) {
+        log('error refreshing auction ' + i + ', skipping');
+        log(e.message + '\n' + e.stack);
+
+        failedRefreshes.push(i);
+      }
+    }
+  }
+
+  log(
+    `fixed ${numFixed} auctions, had ${failedRefreshes.length} failures. retrying any failures now.`
+  );
+
+  let numGivenUpOn = 0;
+  // try the ones again that failed
+  for (const id of failedRefreshes) {
+    try {
+      log(`refreshing previously failed auction ${id}`);
+      await utils.refreshAuction(id, logger);
+    } catch (e: any) {
+      log('error refreshing auction ' + id + 'for the second time, skipping');
+      log(e.message + '\n' + e.stack);
+      numGivenUpOn++;
+    }
+  }
+
+  log(`complete with ${numGivenUpOn} auctions given up on`);
+
+  res.end();
+  // res.status(200).send(response).end();
+};
 
 const refreshAll = async (req, res) => {
   const logger: Logger = (req as any).log;

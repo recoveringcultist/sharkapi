@@ -18,74 +18,74 @@ export const setupCrawler = () => {
 
   const noWrites: boolean = true;
 
-  marketplace.on('Bid', async (auctionId_, amount_, highestBidder) => {
-    const auctionId: number = utils.bscParseInt(auctionId_);
-    let baseMsg = `event: Bid ${auctionId}`;
-    let amount = utils.bscWeiToFloat(amount_);
-    console.info(baseMsg + `: amount: ${amount}, bidder: ${highestBidder}`);
+  // marketplace.on('Bid', async (auctionId_, amount_, highestBidder) => {
+  //   const auctionId: number = utils.bscParseInt(auctionId_);
+  //   let baseMsg = `event: Bid ${auctionId}`;
+  //   let amount = utils.bscWeiToFloat(amount_);
+  //   console.info(baseMsg + `: amount: ${amount}, bidder: ${highestBidder}`);
 
-    if (noWrites) return;
+  //   if (noWrites) return;
 
-    await processBid(auctionId, amount, highestBidder);
-  });
+  //   await processBid(auctionId, amount, highestBidder);
+  // });
 
-  // new auction listed
-  marketplace.on('List', async (auctionId_) => {
-    const auctionId: number = utils.bscParseInt(auctionId_);
-    const baseMsg = `event: List ${auctionId}`;
-    console.info(baseMsg);
+  // // new auction listed
+  // marketplace.on('List', async (auctionId_) => {
+  //   const auctionId: number = utils.bscParseInt(auctionId_);
+  //   const baseMsg = `event: List ${auctionId}`;
+  //   console.info(baseMsg);
 
-    if (noWrites) return;
+  //   if (noWrites) return;
 
-    await processList(auctionId);
-  });
+  //   await processList(auctionId);
+  // });
 
-  // sold event
-  marketplace.on(
-    'Sold',
-    async (auctionId_, salesPrice_, token, highestBidder) => {
-      const auctionId: number = utils.bscParseInt(auctionId_);
-      const salesPrice: number = utils.bscWeiToFloat(salesPrice_);
-      const baseMsg = `event: Sold ${auctionId}`;
+  // // sold event
+  // marketplace.on(
+  //   'Sold',
+  //   async (auctionId_, salesPrice_, token, highestBidder) => {
+  //     const auctionId: number = utils.bscParseInt(auctionId_);
+  //     const salesPrice: number = utils.bscWeiToFloat(salesPrice_);
+  //     const baseMsg = `event: Sold ${auctionId}`;
 
-      console.log(
-        `${baseMsg}: salesPrice: ${salesPrice}, token: ${token}, highestBidder: ${highestBidder}`
-      );
+  //     console.log(
+  //       `${baseMsg}: salesPrice: ${salesPrice}, token: ${token}, highestBidder: ${highestBidder}`
+  //     );
 
-      if (noWrites) return;
+  //     if (noWrites) return;
 
-      await processSold(auctionId, salesPrice, token, highestBidder);
-    }
-  );
+  //     await processSold(auctionId, salesPrice, token, highestBidder);
+  //   }
+  // );
 
-  marketplace.on('WithdrawAll', async (auctionId_, account) => {
-    const auctionId: number = utils.bscParseInt(auctionId_);
-    const baseMsg = `event: WithdrawAll ${auctionId}`;
-    console.info(baseMsg + `: account: ${account}`);
-    if (noWrites) return;
+  // marketplace.on('WithdrawAll', async (auctionId_, account) => {
+  //   const auctionId: number = utils.bscParseInt(auctionId_);
+  //   const baseMsg = `event: WithdrawAll ${auctionId}`;
+  //   console.info(baseMsg + `: account: ${account}`);
+  //   if (noWrites) return;
 
-    await processWithdrawAll(auctionId, account);
-  });
+  //   await processWithdrawAll(auctionId, account);
+  // });
 
-  marketplace.on('CloseAuction', async (auctionId_, highestBidder) => {
-    const auctionId: number = utils.bscParseInt(auctionId_);
-    const baseMsg = `event: CloseAuction ${auctionId}`;
-    console.info(baseMsg + `: highestBidder: ${highestBidder}`);
+  // marketplace.on('CloseAuction', async (auctionId_, highestBidder) => {
+  //   const auctionId: number = utils.bscParseInt(auctionId_);
+  //   const baseMsg = `event: CloseAuction ${auctionId}`;
+  //   console.info(baseMsg + `: highestBidder: ${highestBidder}`);
 
-    if (noWrites) return;
+  //   if (noWrites) return;
 
-    await processCloseAuction(auctionId, highestBidder);
-  });
+  //   await processCloseAuction(auctionId, highestBidder);
+  // });
 
-  marketplace.on('EmergencyWithdrawal', async (auctionId_, highestBidder) => {
-    const auctionId: number = utils.bscParseInt(auctionId_);
-    const baseMsg = `event: EmergencyWithdrawal ${auctionId}`;
-    console.info(baseMsg);
+  // marketplace.on('EmergencyWithdrawal', async (auctionId_, highestBidder) => {
+  //   const auctionId: number = utils.bscParseInt(auctionId_);
+  //   const baseMsg = `event: EmergencyWithdrawal ${auctionId}`;
+  //   console.info(baseMsg);
 
-    if (noWrites) return;
+  //   if (noWrites) return;
 
-    await processEmergencyWithdrawal(auctionId, highestBidder);
-  });
+  //   await processEmergencyWithdrawal(auctionId, highestBidder);
+  // });
 
   return manager;
 };

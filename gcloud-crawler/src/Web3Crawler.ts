@@ -2,6 +2,7 @@
 import {
   MARKETPLACE_CONTRACT,
   NULL_ADDRESS,
+  RPC_URL,
   WEBSOCKET_NODE,
 } from '../../gcloud/src/common/constants';
 import * as MarketplaceABI from '../../gcloud/src/common/NftMarketplace.json';
@@ -91,10 +92,12 @@ export default class Web3Crawler {
       },
     };
 
-    const provider = new Web3.providers.WebsocketProvider(
-      WEBSOCKET_NODE,
-      options
-    );
+    // const provider = new Web3.providers.WebsocketProvider(
+    //   WEBSOCKET_NODE,
+    //   options
+    // );
+
+    const provider = new Web3.providers.HttpProvider(RPC_URL, options);
 
     const web3 = new Web3(provider);
     const contract = new web3.eth.Contract(
