@@ -5,28 +5,55 @@ import { CAKE_APEX_VAULT_CONTRACT, EXCHANGE_SUBGRAPH_URL, WEI } from './common/c
 
 const axios = require('axios');
 
+var finsCoreBuybacks = 0;
+var cakeApexBuybacks = 0;
+var lastRefresh = 0;
 
 const w3 = new Web3Manager();
-//w3.amountCompounded();
 
-w3.getFinsVaultTVL();
-
+getData();
 
 export const createBuybackRoutes = (app, log) => {
-  app.get('/buybacks', log, sampleRoute);
+  app.get('/buybacks', log, buybacksRoute);
 };
 
-const sampleRoute = async (req, res, next) => {
+const buybacksRoute = async (req, res, next) => {
   const logger: Logger = (req as any).log;
 
   // database reference
   const firestore = admin.firestore();
 
+  if (Date.now() / 1000 >= 43200) {
+    getData();
+  }
 
+  let buybacks = {
+    "finsCore": finsCoreBuybacks,
+    "cakeApex": cakeApexBuybacks 
+  }
 
-  logger.info('buybacks sample route called');
-  res.send('buybacks sample route');
+  logger.info('buybacks route called');
+  res.json(buybacks);
 };
+
+async function getData() {
+  getFinsCoreVaultBuybacks();
+  getCakeApexVaultBuybacks();
+  lastRefresh = Date.now() / 1000;
+}
+
+async function getFinsCoreVaultBuybacks() {
+  let tvl = await getFinsVaultTVL();
+  let totalBuyback = await getFinsCoreVaultTotalBuyback(tvl);
+  finsCoreBuybacks = totalBuyback;
+}
+
+async function getCakeApexVaultBuybacks() {
+  let usdFromCake = await getUSDSwappedFromCake();
+  let totalBuyback = await getCakeVaultTotalBuyback(usdFromCake);
+  cakeApexBuybacks = totalBuyback;
+}
+
 
 /**
  * get USD value of CAKE swapped to FINS from the CAKE vault
@@ -48,6 +75,7 @@ async function getUSDSwappedFromCake() {
                   transaction {
                     id
                   }
+                  id
                   sender
                   from
                   to
@@ -58,8 +86,10 @@ async function getUSDSwappedFromCake() {
     let total = 0;
     let swaps = data.data.data.swaps;
     for (const swap of swaps) {
-      let swapAmount = Number(swap.amountUSD);
-      total += swapAmount;
+      if (swap.id.includes("-1")) {
+        let swapAmount = Number(swap.amountUSD);
+        total += swapAmount;
+      }
     }
     return total;
 }
@@ -82,11 +112,29 @@ async function getFinsDailyAPR() {
   return dailyReturn;
 } */
 
-async function getVaultTotalBuyback(amount: number) {
+async function getFinsVaultTVL() {
+  let totalTokens = await w3.getFinsVaultBalance();
+  var query: String = `
+            query Token {
+              tokens(where: {symbol: "FINS"}) {
+                  derivedUSD
+                }
+            }`
+  let data = await axios.post(EXCHANGE_SUBGRAPH_URL, {query: query});
+  let price = data.data.data.tokens[0].derivedUSD;
+  return totalTokens * price;
+}
+
+async function getFinsCoreVaultTotalBuyback(tvl: number) {
   let finsAPR = await w3.getFinsAPR();
   let dailyROI = finsAPR / 365;
-  console.log(dailyROI);
-  let total = amount + (dailyROI * amount);
-  console.log(total);
+  return tvl * (dailyROI / 100);
+}
+
+async function getCakeVaultTotalBuyback(amount: number) {
+  let finsAPR = await w3.getFinsAPR();
+  let dailyROI = finsAPR / 365;
+  let total = amount + (dailyROI * (amount / 1000));
+  return total
 }
 

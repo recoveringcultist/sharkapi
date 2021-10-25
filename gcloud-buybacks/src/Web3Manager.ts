@@ -120,10 +120,9 @@ export default class Web3Manager {
         return dividendsInfo.poolAPY.bnb / (10 ** 16);
     }
 
-    async getFinsVaultTVL() {
+    async getFinsVaultBalance() {
         const contract = this._finsVaultContract;
-        let totalShares = await contract.methods.totalSupply().call();
-        console.log(totalShares / WEI);
-        return totalShares / WEI;
+        let totalBalance: number = await contract.methods.balance().call();
+        return totalBalance / WEI;
     }
 }
