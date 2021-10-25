@@ -14,7 +14,7 @@
   },
   "scripts": {
     "start": "node dist/app.js",
-    "build": "rm -rf dist/* && tsc",
+    "build": "tsc",
     "compile": "tsc && node ./dist/app.js",
     "dev": "nodemon -e ts --exec \"npm run compile\"",
     "test": "mocha --exit test/*.test.js",
