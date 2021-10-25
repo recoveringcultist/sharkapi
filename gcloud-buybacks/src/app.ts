@@ -4,11 +4,15 @@ import express from 'express';
 import cors from 'cors';
 
 import * as admin from 'firebase-admin';
+const serviceAccount = require('../cert/auto-shark-firebase-adminsdk-wfxle-31eb7a6ea3.json');
 const lb = require('@google-cloud/logging-bunyan');
 import { createBuybackRoutes } from './buybacks';
 
 async function startServer() {
-  admin.initializeApp();
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+    databaseURL: 'https://auto-shark-default-rtdb.firebaseio.com/',
+  });
   const firestore = admin.firestore();
 
   const { logger, mw: buybackLog } = await lb.express.middleware({
