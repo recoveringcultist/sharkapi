@@ -13,7 +13,6 @@ async function startServer() {
     credential: admin.credential.cert(serviceAccount),
     databaseURL: 'https://auto-shark-default-rtdb.firebaseio.com/',
   });
-  const firestore = admin.firestore();
 
   const { logger, mw: buybackLog } = await lb.express.middleware({
     logName: 'buybacks',
