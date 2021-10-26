@@ -34,10 +34,10 @@ const refreshRoute = async (req, res, next) => {
 };
 
 
-function saveToDB() {
+async function saveToDB() {
   const db = admin.database();
   const buybacksRef = db.ref('/buybacks');
-  buybacksRef.set(buybackData)
+  await buybacksRef.set(buybackData);
 }
 
 async function retrieveFromDB() {
@@ -65,7 +65,7 @@ async function getData(refresh: boolean = false) {
     await getBSWApexVaultBuybacks();
     await getBabyApexVaultBuybacks();
     buybackData.lastRefresh = Math.round(Date.now() / 1000);
-    saveToDB();
+    await saveToDB();
 
   }
 }
