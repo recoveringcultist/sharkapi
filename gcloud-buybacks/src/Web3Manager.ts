@@ -2,13 +2,9 @@ import Web3 from 'web3';
 import { Contract } from 'web3-eth-contract';
 import * as DividendsABI from './common/dividends.json';
 import { FINS_DIVIDENDS_CONTRACT, RPC_URL, JAWS_DIVIDENDS_CONTRACT, WEI, FINS_MAX_VAULT_CONTRACT } from './common/constants';
+import * as admin from 'firebase-admin';
 
 const fs = require('fs');
-
-export default interface Event {
-
-}
-
 
 export default class Web3Manager {
     private static readonly NAME: string = 'Web3Manager';
@@ -16,10 +12,6 @@ export default class Web3Manager {
     private _provider;
     private _dividendsContract: Contract;
     private _finsVaultContract: Contract;
-    private _lastBlockProcessed: number = 0;
-    private _maxBatchSize: number;
-    private _processing: boolean = false;
-    private _intervalMillis: number;
   
     log(msg: string) {
       console.log(Web3Manager.NAME + ': ' + msg);
@@ -57,8 +49,8 @@ export default class Web3Manager {
         },
       };
   
-      var provider = new Web3.providers.WebsocketProvider(
-        'wss://ws-nd-996-979-001.p2pify.com/3360ae26e76ac4763496b5c0818c6265',
+      var provider = new Web3.providers.HttpProvider(
+        RPC_URL,
         options
       ); 
 
@@ -80,38 +72,12 @@ export default class Web3Manager {
   
     destroyConnection() {}
   
-    constructor(intervalMillis: number = 5000, maxBatchSize: number = 100) {
+    constructor() {
       const { web3, divContract, vaultContract, provider } = this.initConnection();
       this._web3 = web3;
       this._dividendsContract = divContract;
       this._finsVaultContract = vaultContract;
       this._provider = provider;
-  
-      this._intervalMillis = intervalMillis;
-      this._maxBatchSize = maxBatchSize;
-  
-      // const db = admin.database();
-      // db.ref('/lastBlockProcessed').once('value', (data) => {
-      //   this._lastBlockProcessed = data.val();
-      //   this.log('startup, last block processed=' + this._lastBlockProcessed);
-      // });
-    }
-
-    async getAmountCompounded() {
-        const web3 = this._web3;
-        const contract = this._dividendsContract;
-        var latestBlock = await web3.eth.getBlockNumber();
-        for (let i = 0; i < 6; i++) {
-            var options = {fromBlock: latestBlock-5000, toBlock: latestBlock}
-            console.log(options);
-            var events = await contract.getPastEvents('Compounded', options);
-            for (const event of events) {
-                console.log(event);
-            }
-            latestBlock -= 5000;
-        }
-        //contract.eth.functions()
-        return
     }
 
     async getFinsAPR() {
