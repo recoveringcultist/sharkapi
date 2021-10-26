@@ -5,11 +5,11 @@ import { CAKE_APEX_VAULT_CONTRACT, EXCHANGE_SUBGRAPH_URL, WEI } from './common/c
 
 const axios = require('axios');
 
-var finsCoreBuybacks = 0;
-var cakeApexBuybacks = 0;
-var lastRefresh = 0;
+var buybackData = {buybacks: {finsCoreUSD: 0, cakeApexUSD: 0}, lastRefresh: 0};
 
 const w3 = new Web3Manager();
+const db = admin.database();
+const buybacksRef = db.ref('/buybacks');
 
 getData();
 
@@ -20,38 +20,54 @@ export const createBuybackRoutes = (app, log) => {
 const buybacksRoute = async (req, res, next) => {
   const logger: Logger = (req as any).log;
 
-  // database reference
-  const firestore = admin.firestore();
-
-  if (Date.now() / 1000 >= 43200) {
+  // If data hasn't been refreshed in 12 hours, refresh it
+  if ((Date.now() / 1000) - buybackData.lastRefresh >= 43200) {
     getData();
   }
 
-  let buybacks = {
-    "finsCore": finsCoreBuybacks,
-    "cakeApex": cakeApexBuybacks 
-  }
-
   logger.info('buybacks route called');
-  res.json(buybacks);
+  res.json(buybackData);
 };
 
+
+function saveToDB() {
+  buybacksRef.set(buybackData)
+}
+
+async function retrieveFromDB() {
+  let data = await buybacksRef.once('value');
+  return data.val();
+}
+
 async function getData() {
-  getFinsCoreVaultBuybacks();
-  getCakeApexVaultBuybacks();
-  lastRefresh = Date.now() / 1000;
+  let dbData = await retrieveFromDB();
+
+  // If data isn't null and hasn't been more than 12 hours since refresh, use DB data
+  if (dbData != null && (Date.now() / 1000) - dbData.lastRefresh < 43200) {
+
+    buybackData = dbData;
+
+  } else {
+  // Else refresh it and save to DB
+  
+    await getFinsCoreVaultBuybacks();
+    await getCakeApexVaultBuybacks();
+    buybackData.lastRefresh = Date.now() / 1000;
+    //saveToDB();
+
+  }
 }
 
 async function getFinsCoreVaultBuybacks() {
   let tvl = await getFinsVaultTVL();
   let totalBuyback = await getFinsCoreVaultTotalBuyback(tvl);
-  finsCoreBuybacks = totalBuyback;
+  buybackData.buybacks.finsCoreUSD = totalBuyback;
 }
 
 async function getCakeApexVaultBuybacks() {
   let usdFromCake = await getUSDSwappedFromCake();
   let totalBuyback = await getCakeVaultTotalBuyback(usdFromCake);
-  cakeApexBuybacks = totalBuyback;
+  buybackData.buybacks.cakeApexUSD = totalBuyback;
 }
 
 
