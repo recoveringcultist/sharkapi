@@ -18,8 +18,10 @@
     "test": "mocha --exit test/*.test.js",
     "serve": "npm run build && npm start",
     "logs": "gcloud app logs tail -s crawler",
-    "deploy": "npm run build && gcloud app deploy & gcloud app browse -s crawler",
-    "localcreds": "gcloud auth application-default login"
+    "deploy": "npm run build && gcloud app deploy --project auto-shark & gcloud app browse --project auto-shark -s crawler",
+    "localcreds": "gcloud auth application-default login",
+    "gcloud-setproject": "gcloud config set project auto-shark",
+    "gcloud-activate-config": "gcloud config configurations activate auto-shark"
   },
   "dependencies": {
     "@google-cloud/logging": "^9.5.5",
