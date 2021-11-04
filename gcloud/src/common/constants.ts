@@ -16,3 +16,15 @@ export const HTTP_NODE: string =
   'https://nd-996-979-001.p2pify.com/3360ae26e76ac4763496b5c0818c6265';
 export const MARKETPLACE_CONTRACT: string =
   '0x7579Cc6c2edC67Cf446bA11C4FfFae874A6808C0';
+
+export const JAWS_DIVPOOL: string =
+  '0x5D2112Ba0969EC66012380C1fb88F2A3D182Eb90';
+export const LOCKJAW_ABI = `[
+    {
+      "inputs": [],
+      "name": "emergencyLock",
+      "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ]`;

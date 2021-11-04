@@ -32,6 +32,7 @@ export const createApiRoutes = (app, log) => {
   app.get('/api/bsc/highestbid/:id', log, bscHighestBid);
   app.get('/api/bsc/getuserbidslength/:address', log, bscGetUserBidsLength);
   app.get('/api/bsc/getuserbids/:address', log, bscGetUserBids);
+  app.get('/api/bsc/lockjaw', log, bscGetLockjaw);
   // app.get('/api/maintenance3', log, maintenance3);
   // app.get('/api/maintenance4', log, maintenance4);
   // app.get('/api/maintenance5', log, maintenance5);
@@ -791,6 +792,16 @@ const fixMissingAuctions = async (req, res) => {
 
   res.end();
   // res.status(200).send(response).end();
+};
+
+const bscGetLockjaw = async (req, res, next) => {
+  const logger: Logger = (req as any).log;
+  try {
+    const result = await utils.bscLockjaw(logger);
+    res.json({ lockjaw: result });
+  } catch (err) {
+    return next(err);
+  }
 };
 
 const refreshAll = async (req, res) => {

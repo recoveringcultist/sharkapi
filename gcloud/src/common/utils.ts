@@ -19,6 +19,8 @@ import {
   SSS1_NFT,
   SSS2_NFT,
   SSS2OG_NFT,
+  LOCKJAW_ABI,
+  JAWS_DIVPOOL,
 } from './constants';
 import { Logger } from '@google-cloud/logging-bunyan/build/src/middleware/express';
 
@@ -26,6 +28,8 @@ export const getRpcPRovider = () => new providers.JsonRpcProvider(RPC_URL);
 
 export const getMarketplaceContract = () =>
   new Contract(MARKETPLACE_CONTRACT, MarketplaceABI.abi, getRpcPRovider());
+export const getLockJawContract = () =>
+  new Contract(JAWS_DIVPOOL, LOCKJAW_ABI, getRpcPRovider());
 
 /**
  * BSC: get total number of auctions
@@ -258,6 +262,23 @@ export async function bscGetUserBidsLength(
   ); // await contract.getUserBidsLength(address);
   // console.log(numBids);
   return bscParseInt(numBids);
+}
+
+/**
+ * get whether lockjaw is on
+ * @param contract
+ * @param address
+ */
+export async function bscLockjaw(logger?: Logger) {
+  let contract = getLockJawContract();
+  const isLocked: boolean = await contractCall(
+    'emergencyLock',
+    [],
+    contract,
+    logger
+  ); // await contract.getUserBidsLength(address);
+  // console.log(numBids);
+  return isLocked;
 }
 
 /**
